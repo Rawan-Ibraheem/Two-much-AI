@@ -1,13 +1,29 @@
 // Pharmacy source registry.
 //
-// Three independent facts, deliberately kept apart:
+// Four independent facts, deliberately kept apart:
 //
-//   city/country  - the market this pharmacy operates in. All nine are
-//                   Alexandria, Egypt. This is NOT verified branch data.
-//   status        - how the app may use the source today. Only 'demo_source'
-//                   feeds the demo; nothing here is live-connected.
-//   dataStatus    - what was actually observed on the public site. A public
-//                   catalog does not mean the app may collect prices or stock.
+//   city/country   - the market this pharmacy operates in. All eight are
+//                    Alexandria, Egypt. This is NOT verified branch data.
+//   authorization  - has the pharmacy explicitly granted data-collection
+//                    permission? A legal/business fact. Every source here is
+//                    'not_granted': nothing in this file implies consent.
+//   capability     - the STATIC, verified technical answer to "can we reach
+//                    real product data with an ordinary HTTP request, no
+//                    browser/JS rendering?" ('public_api' | 'requires_browser'
+//                    | 'not_searchable'). This was determined by directly
+//                    inspecting each live site (robots.txt, homepage HTML,
+//                    and - where a plausible public endpoint existed -
+//                    actually calling it) on 2026-09-10. It does not change
+//                    on its own; only a new inspection changes it.
+//   status         - the DYNAMIC, live-refreshed field. Starts equal to
+//                    capability's honest baseline and is updated in-memory
+//                    by pharmacy-refresh.js every hour: 'connected' while the
+//                    live connector answers, 'unavailable'/'error' if a
+//                    refresh attempt for a connected source fails, and left
+//                    untouched for sources with no connector at all.
+//
+// `capability: 'public_api'` sources have a matching `connector` describing
+// the exact endpoint used. No source may be marked 'public_api' without one.
 //
 // Verified branch records (addresses, coordinates) live in
 // pharmacy-directory.js and exist for only a subset of these pharmacies.
@@ -19,21 +35,27 @@ const pharmacySources = [
     arabicName: 'صيدليات أسامة الطيبي',
     website: 'https://taypharmacies.com/',
     websiteUrl: 'https://taypharmacies.com/',
-    sourceType: 'http_catalog_parser',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://taypharmacies.com/shop',
-    branchesUrl: 'https://taypharmacies.com/عناوين-فروع-الطيبي',
     phone: null,
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
-    dataStatus: 'public_catalog_observed',
+    capability: 'public_api',
+    connector: {
+      type: 'woocommerce_store_api',
+      // WooCommerce's public, unauthenticated Store API - meant for headless
+      // storefronts. Confirmed live: returns real product name, price (EGP,
+      // minor units), stock status and product permalink for a free-text
+      // `search` query.
+      searchUrl: 'https://taypharmacies.com/wp-json/wc/store/v1/products',
+      fields: ['name', 'price', 'currency', 'availability', 'productUrl']
+    },
+    status: 'connected',
+    dataStatus: 'live_verified',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://taypharmacies.com/robots.txt',
-    allowedPaths: ['/shop', '/product/'],
+    allowedPaths: ['/shop', '/product/', '/wp-json/wc/store/'],
     blockedPatterns: ['/cart', '/checkout', '/my-account'],
-    notes: 'Public shop pages expose product names, prices, product IDs, categories and branch-address navigation. No application connector is enabled.'
+    notes: 'Verified live on 2026-09-10: /wp-json/wc/store/v1/products?search=panadol returned real matching products with price and stock status. No public branch/location directory was found, so results carry no distance.'
   },
   {
     id: 'el-ezaby',
@@ -41,23 +63,19 @@ const pharmacySources = [
     arabicName: 'صيدليات العزبي',
     website: 'https://elezabypharmacy.com/',
     websiteUrl: 'https://elezabypharmacy.com/',
-    sourceType: 'demo_catalog',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: null,
-    branchesUrl: 'https://elezabypharmacy.com/the-app-2/',
     phone: '19600',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    // Not a live connection: this is the source the demo catalog is attributed
-    // to. Its offers are synthetic, so 'connected' would overstate it.
-    status: 'demo_source',
+    capability: 'not_searchable',
+    connector: null,
+    status: 'not_searchable',
     dataStatus: 'demo_catalog_unverified',
-    lastChecked: null,
+    lastChecked: '2026-09-10',
     robotsUrl: 'https://www.elezabypharmacy.com/robots.txt',
     allowedPaths: [],
     blockedPatterns: ['/wp-admin', '/account', '/checkout'],
-    notes: 'Remains the existing working demo source. Offers are synthetic and unverified; the public site inspection found services, branch-network claims and hotline information, not a public product catalog.'
+    notes: 'WordPress site with no store/e-commerce plugin route active (/wp-json/wc/* returns 404). No public product catalog exists to search. Remains the legacy demo source: the offers attributed to it in mock-medicines.js/server.js are synthetic and are always labeled unverified/demo, never presented as live.'
   },
   {
     id: 'el-kattan',
@@ -65,49 +83,19 @@ const pharmacySources = [
     arabicName: 'صيدليات القطان',
     website: 'https://elkattanpharmacies.com/',
     websiteUrl: 'https://elkattanpharmacies.com/',
-    sourceType: 'manual',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: null,
-    // The notes below record that no branch directory was found, so there is no
-    // branches URL to claim - the bare homepage is not one.
-    branchesUrl: null,
     phone: '19291',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'manual',
+    capability: 'not_searchable',
+    connector: null,
+    status: 'not_searchable',
     dataStatus: 'service_site_only',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://elkattanpharmacies.com/robots.txt',
     allowedPaths: [],
     blockedPatterns: ['/wp-admin', '/wp-login'],
-    notes: 'The public page describes Alexandria delivery and services and exposes a hotline, but no medicine catalog, prices, stock, product IDs or branch directory were observed.'
-  },
-  {
-    id: 'el-kahlily',
-    name: 'El Kahlily Pharmacy',
-    arabicName: 'صيدليات الخليلي',
-    // The only URL supplied for this pharmacy is a Talabat marketplace listing,
-    // not its own site, so `website` stays null and the listing is recorded
-    // separately. Do not present the Talabat page as the pharmacy's website.
-    website: null,
-    websiteUrl: null,
-    externalListingUrl: 'https://www.talabat.com/ar/egypt/pharmacy/786864/elkhallili-pharmacies-montazah?aid=7129',
-    sourceType: 'external_marketplace',
-    city: 'Alexandria',
-    country: 'Egypt',
-    catalogUrl: 'https://www.talabat.com/ar/egypt/pharmacy/786864/elkhallili-pharmacies-montazah?aid=7129',
-    branchesUrl: null,
-    phone: null,
-    // No pharmacy has granted data-collection permission yet.
-    authorization: 'not_granted',
-    status: 'external',
-    dataStatus: 'external_reference_only',
-    lastChecked: '2026-09-10',
-    robotsUrl: 'https://www.talabat.com/robots.txt',
-    allowedPaths: [],
-    blockedPatterns: ['?aid=', '/cart', '/checkout'],
-    notes: 'The supplied Talabat URL redirected to a tracking endpoint during inspection. No catalog, price, stock, branch or API data was treated as verified.'
+    notes: 'The public homepage describes Alexandria delivery/services and a hotline, but no medicine catalog. Its own WordPress API path (/wp-json/) returns HTTP 406 from a ModSecurity rule, so no product data is reachable even in principle.'
   },
   {
     id: 'khalil',
@@ -115,21 +103,19 @@ const pharmacySources = [
     arabicName: 'صيدليات خليل',
     website: 'https://www.khalilpharmacy.com/en',
     websiteUrl: 'https://www.khalilpharmacy.com/en',
-    sourceType: 'http_catalog_parser',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://www.khalilpharmacy.com/en/product/medication',
-    branchesUrl: null,
     phone: '19040',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
+    capability: 'requires_browser',
+    connector: null,
+    status: 'requires_browser',
     dataStatus: 'public_catalog_observed',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://www.khalilpharmacy.com/robots.txt',
-    allowedPaths: ['/en/product/', '/en/products/'],
+    allowedPaths: [],
     blockedPatterns: ['/cart', '/checkout', '/account'],
-    notes: 'Public pages expose product URLs, prices, categories, pagination parameters and out-of-stock labels. Alexandria branch coverage was not verified from the inspected page.'
+    notes: 'Angular single-page app (<app-root>, empty on a plain HTTP fetch) - product data is rendered client-side after JS runs. A bounded search for a documented public data API found none. Not connected without a browser-rendering fallback, which was out of scope for this pass.'
   },
   {
     id: 'sabry',
@@ -137,21 +123,25 @@ const pharmacySources = [
     arabicName: 'صيدلية صبري',
     website: 'https://pharmacysabry.com/',
     websiteUrl: 'https://pharmacysabry.com/',
-    sourceType: 'shopify_catalog',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://pharmacysabry.com/collections/all-products',
-    branchesUrl: null,
     phone: '035428101',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
-    dataStatus: 'public_catalog_observed',
+    capability: 'public_api',
+    connector: {
+      type: 'shopify_predictive_search',
+      // Shopify's own storefront predictive-search endpoint (what the site's
+      // search box calls). Public, unauthenticated, robots.txt-allowed.
+      searchUrl: 'https://pharmacysabry.com/search/suggest.json',
+      fields: ['name', 'price', 'availability', 'productUrl']
+    },
+    status: 'connected',
+    dataStatus: 'live_verified',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://pharmacysabry.com/robots.txt',
-    allowedPaths: ['/products/', '/collections/'],
+    allowedPaths: ['/products/', '/collections/', '/search/suggest.json'],
     blockedPatterns: ['/cart', '/account', '/checkout'],
-    notes: 'Shopify-style public catalog exposes product URLs, prices, sale prices, categories and sold-out labels. The inspected footer identifies Roshdy, Alexandria; branch coordinates were not verified.'
+    notes: 'Verified live on 2026-09-10: the Shopify catalog is real and searchable, but is overwhelmingly skincare/cosmetics/supplements. Common OTC medicines in this demo (panadol, brufen, augmentin, ...) returned zero matches in testing - an honest "no real offer" rather than a fabricated one.'
   },
   {
     id: 'haggag',
@@ -159,21 +149,19 @@ const pharmacySources = [
     arabicName: 'صيدلية حجاج',
     website: 'https://haggagstores.com/',
     websiteUrl: 'https://haggagstores.com/',
-    sourceType: 'http_catalog_parser',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://haggagstores.com/',
-    branchesUrl: null,
     phone: '+201001267006',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
+    capability: 'requires_browser',
+    connector: null,
+    status: 'requires_browser',
     dataStatus: 'public_catalog_observed',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://haggagstores.com/robots.txt',
-    allowedPaths: ['/'],
+    allowedPaths: [],
     blockedPatterns: ['/account', '/cart', '/checkout'],
-    notes: 'Public storefront exposes product names, prices, discounts, categories and product images. The inspected page did not establish Alexandria branch addresses or a public API.'
+    notes: 'Server-rendered Next.js shell (__NEXT_DATA__) only carries page layout; actual product listings are fetched client-side from an internal, undocumented storefront-platform API ("Sllr"). Reverse-engineering an undocumented private API was treated as out of scope, so this source is not connected.'
   },
   {
     id: 'seif',
@@ -181,21 +169,19 @@ const pharmacySources = [
     arabicName: 'صيدليات سيف',
     website: 'https://seif-online.com/en',
     websiteUrl: 'https://seif-online.com/en',
-    sourceType: 'http_catalog_parser',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://seif-online.com/en/category/medicine',
-    branchesUrl: null,
     phone: '19199',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
+    capability: 'requires_browser',
+    connector: null,
+    status: 'requires_browser',
     dataStatus: 'public_catalog_observed',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://www.seif-online.com/robots.txt',
-    allowedPaths: ['/en/product/', '/ar/product/', '/en/category/', '/ar/category/'],
+    allowedPaths: [],
     blockedPatterns: ['/cart', '/checkout', '/account', '/login', '/prescriptions'],
-    notes: 'Public pages expose medicine categories, product pages, brand pages, product links and hotline. Live price/stock and Alexandria branch records were not verified from the inspected page.'
+    notes: 'Angular single-page app (<app-root>, empty on a plain HTTP fetch) - product data is rendered client-side after JS runs. A bounded search for a documented public data API found none. Remains one of the two branches in the demo catalog (Seif Pharmacy: Sidi Gaber); those offers stay clearly labeled demo/unverified.'
   },
   {
     id: 'anwar',
@@ -203,21 +189,23 @@ const pharmacySources = [
     arabicName: 'صيدليات أنور',
     website: 'https://anwar.store/',
     websiteUrl: 'https://anwar.store/',
-    sourceType: 'shopify_catalog',
     city: 'Alexandria',
     country: 'Egypt',
-    catalogUrl: 'https://anwar.store/collections',
-    branchesUrl: 'https://anwar.store/pages/contact-us',
     phone: '01203337999',
-    // No pharmacy has granted data-collection permission yet.
     authorization: 'not_granted',
-    status: 'catalog_available',
-    dataStatus: 'public_catalog_observed',
+    capability: 'public_api',
+    connector: {
+      type: 'shopify_predictive_search',
+      searchUrl: 'https://anwar.store/search/suggest.json',
+      fields: ['name', 'price', 'availability', 'productUrl']
+    },
+    status: 'connected',
+    dataStatus: 'live_verified',
     lastChecked: '2026-09-10',
     robotsUrl: 'https://anwar.store/robots.txt',
-    allowedPaths: ['/products/', '/collections/'],
+    allowedPaths: ['/products/', '/collections/', '/search/suggest.json'],
     blockedPatterns: ['/cart', '/account', '/checkout'],
-    notes: 'Public Shopify catalog exposes product URLs, prices, sale prices, categories and search. The page lists Alexandria neighborhoods with map links, but complete branch addresses and coordinates were not added to the demo.'
+    notes: 'Verified live on 2026-09-10: the Shopify catalog is real and searchable, and did surface a genuine match for "otrivin" (a nasal decongestant already in this demo catalog). Most other demo medicines (panadol, brufen, ...) are not stocked online, so they honestly return zero results.'
   }
 ];
 
@@ -228,11 +216,11 @@ function getPharmacySource(id) {
 /**
  * Path policy only: is `path` inside the conservative allow-list recorded for
  * this source? This is NOT a permission check - every source currently has
- * `authorization: 'not_granted'`, so no connector may actually fetch from any
- * of them. A connector must check `authorization` as well.
+ * `authorization: 'not_granted'`, so no connector may fetch anything beyond
+ * the specific public endpoint already verified for it.
  */
 function canCrawl(source, path) {
-  if (!source || source.status !== 'catalog_available') return false;
+  if (!source || source.capability === 'not_searchable') return false;
   if (!source.allowedPaths.some((allowedPath) => path.startsWith(allowedPath))) return false;
   return !source.blockedPatterns.some((blockedPattern) => path.includes(blockedPattern));
 }

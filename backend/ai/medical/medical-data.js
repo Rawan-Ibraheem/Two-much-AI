@@ -36,7 +36,7 @@ const SYMPTOM_RECOMMENDATIONS = {
 const SYMPTOM_KEYWORDS = {
   headache: [
     'headache', 'headaches', 'head ache', 'head hurts', 'head hurt', 'head pain', 'head is hurting',
-    'صداع', 'صداع في الراس', 'دماغي بتوجعني', 'وجعني دماغي', 'راسي بيوجعني', 'وجعني راسي'
+    'صداع', 'وصداع', 'صداع في الراس', 'دماغي بتوجعني', 'وجعني دماغي', 'راسي بيوجعني', 'وجعني راسي'
   ],
   fever: [
     'fever', 'high temperature', 'i have a temperature', 'running a temperature',

@@ -41,3 +41,10 @@ coverage/
 # Operating system files
 .DS_Store
 Thumbs.db
+
+
+
+node_modules/
+dist/
+build/
+.env

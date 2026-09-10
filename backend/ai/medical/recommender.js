@@ -25,7 +25,7 @@ const URGENT = {
   message: 'These symptoms may require urgent medical attention. Please seek medical care immediately or contact a doctor/emergency service - do not rely on this tool.'
 };
 
-const DISCLAIMER = 'This is not a diagnosis or medical advice. If symptoms persist, worsen, or you are unsure, consult a pharmacist or doctor.';
+const DISCLAIMER = 'This is not a diagnosis or medical advice. Check the medicine label and consult a pharmacist or doctor, especially if you have other conditions or take other medicines.';
 
 // Whole word/phrase containment: pads both sides with spaces so a keyword
 // like "cold" doesn't fire inside an unrelated word, while still allowing

@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createServer } = require('./server');
+const { createServer, cachedOffersForQuery } = require('./server');
 
 test('health endpoint reports a running API', async (t) => {
   const server = createServer().listen(0);
@@ -25,10 +25,23 @@ test('pharmacy sources endpoint returns all configured sources', async (t) => {
 
   assert.equal(response.status, 200);
   assert.deepEqual(body.sources.map((source) => source.id), [
-    'tay', 'el-ezaby', 'el-kattan', 'el-kahlily', 'khalil',
+    'tay', 'el-ezaby', 'el-kattan', 'khalil',
     'sabry', 'haggag', 'seif', 'anwar'
   ]);
-  assert.equal(body.sources.find((source) => source.id === 'el-ezaby').status, 'demo_source');
+  assert.equal(body.sources.find((source) => source.id === 'el-ezaby').status, 'not_searchable');
+  assert.equal(body.sources.find((source) => source.id === 'tay').searchable, true);
+});
+
+test('cached public catalog results are explicitly not live', () => {
+  const panadol = cachedOffersForQuery('Panadol Extra');
+  assert.equal(panadol.length, 1);
+  assert.equal(panadol[0].sourceId, 'seif');
+  assert.equal(panadol[0].dataStatus, 'cached');
+  assert.equal(panadol[0].verificationStatus, 'not_live');
+  assert.equal(panadol[0].available, null);
+  assert.equal(panadol[0].price, null);
+  assert.match(panadol[0].productUrl, /^https:\/\/seif-online\.com\//);
+  assert.match(panadol[0].sourceUrl, /sitemap_products_en\.xml$/);
 });
 
 test('medicine search filters by name or ingredient', async (t) => {

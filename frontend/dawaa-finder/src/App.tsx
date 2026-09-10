@@ -26,6 +26,7 @@ import {
   requestBrowserLocation,
   ALEXANDRIA_CENTRE
 } from './services/api';
+import AiAssistant from './components/AiAssistant';
 import type {
   AiAssist,
   MedicineProduct,
@@ -38,11 +39,12 @@ import type {
 type Language = 'en' | 'ar';
 
 /** Offer ordering inside a product card. Product ordering comes from the API. */
+const nullableNumber = (value: number | null) => value ?? Number.POSITIVE_INFINITY;
 const OFFER_COMPARATORS: Record<SortOption, (a: PharmacyOffer, b: PharmacyOffer) => number> = {
-  cheapest: (a, b) => Number(b.available) - Number(a.available) || a.price - b.price,
-  nearest: (a, b) => a.distanceKm - b.distanceKm,
+  cheapest: (a, b) => Number(b.available) - Number(a.available) || nullableNumber(a.price) - nullableNumber(b.price),
+  nearest: (a, b) => nullableNumber(a.distanceKm) - nullableNumber(b.distanceKm),
   freshest: (a, b) => Date.parse(b.lastCheckedIso) - Date.parse(a.lastCheckedIso),
-  best_match: (a, b) => Number(b.available) - Number(a.available) || a.price - b.price
+  best_match: (a, b) => Number(b.available) - Number(a.available) || nullableNumber(a.price) - nullableNumber(b.price)
 };
 
 export default function App() {
@@ -61,6 +63,7 @@ export default function App() {
   const [medicines, setMedicines] = useState<MedicineProduct[]>([]);
   const [aiAssist, setAiAssist] = useState<AiAssist>({ status: 'not_needed' });
   const [freshnessNote, setFreshnessNote] = useState('');
+  const [dataStatus, setDataStatus] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -94,7 +97,7 @@ export default function App() {
       location: 'Location',
       useLocation: 'Use my location',
       locating: 'Locating...',
-      noLocation: 'Location off — distances are catalog estimates',
+      noLocation: 'Location off — live branch distance is unavailable',
       sortBy: 'Sort by:',
       cheapest: 'Cheapest',
       nearest: 'Nearest',
@@ -116,6 +119,14 @@ export default function App() {
       foundMedicines: 'matching medicines',
       noResultsTitle: 'No matches found',
       noResultsDesc: 'Try a different spelling, or search by active ingredient.',
+      noLiveResults: 'No live pharmacy availability found.',
+      distanceUnavailable: 'Distance unavailable',
+      onlineListing: 'Online listing',
+      priceUnavailable: 'Price unavailable',
+      liveVerified: 'Live verified',
+      notLive: 'Not live',
+      catalogMayChange: 'Catalog data — availability and price may have changed.',
+      availabilityUnknown: 'Availability unknown',
       errorTitle: 'Could not reach the search API',
       errorDesc: 'Start the backend with `npm --prefix backend start`, then search again.',
       retry: 'Try again',
@@ -139,7 +150,7 @@ export default function App() {
       location: 'الموقع',
       useLocation: 'استخدم موقعي',
       locating: 'جارٍ تحديد الموقع...',
-      noLocation: 'الموقع غير مُفعّل — المسافات تقديرية',
+      noLocation: 'الموقع غير مُفعّل — مسافة الفرع الحي غير متاحة',
       sortBy: 'ترتيب حسب:',
       cheapest: 'الأرخص',
       nearest: 'الأقرب',
@@ -161,6 +172,14 @@ export default function App() {
       foundMedicines: 'أدوية مطابقة',
       noResultsTitle: 'لا توجد نتائج',
       noResultsDesc: 'جرّب كتابة الاسم بشكل مختلف أو ابحث بالمادة الفعالة.',
+      noLiveResults: 'لم يتم العثور على توفر حي في الصيدليات.',
+      distanceUnavailable: 'المسافة غير متاحة',
+      onlineListing: 'عرض أونلاين',
+      priceUnavailable: 'السعر غير متاح',
+      liveVerified: 'تم التحقق مباشرة',
+      notLive: 'غير مباشر',
+      catalogMayChange: 'بيانات الكتالوج — قد يكون السعر والتوفر قد تغيّرا.',
+      availabilityUnknown: 'التوفر غير معروف',
       errorTitle: 'تعذّر الوصول إلى خدمة البحث',
       errorDesc: 'شغّل الخدمة بالأمر `npm --prefix backend start` ثم أعد البحث.',
       retry: 'حاول مرة أخرى',
@@ -198,6 +217,7 @@ export default function App() {
       setMedicines(response.results);
       setAiAssist(response.aiAssist);
       setFreshnessNote(response.freshnessNote);
+      setDataStatus(response.dataStatus);
     } catch (error) {
       if ((error as Error).name === 'AbortError') return;
       setMedicines([]);
@@ -282,14 +302,21 @@ export default function App() {
       medicines
         .map((medicine) => {
           const offers = medicine.offers
-            .filter((offer) => offer.price <= maxPrice && offer.distanceKm <= maxDistance)
+            .filter((offer) =>
+              (!onlyAvailable || offer.available)
+              && (offer.price === null || offer.price <= maxPrice)
+              && (offer.distanceKm === null || offer.distanceKm <= maxDistance)
+            )
             .sort(OFFER_COMPARATORS[sortBy]);
           const inStock = offers.filter((offer) => offer.available);
 
           return {
             medicine,
             offers,
-            cheapestPrice: inStock.length ? Math.min(...inStock.map((offer) => offer.price)) : null,
+            cheapestPrice: (() => {
+              const prices = inStock.map((offer) => offer.price).filter((price): price is number => price !== null);
+              return prices.length ? Math.min(...prices) : null;
+            })(),
             pharmaciesCount: new Set(offers.map((offer) => offer.pharmacyName)).size
           };
         })
@@ -307,6 +334,15 @@ export default function App() {
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-extrabold text-slate-900 text-sm">{offer.pharmacyName}</span>
+          {offer.dataStatus === 'live' ? (
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+              {t.liveVerified}
+            </span>
+          ) : (
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              {t.notLive}
+            </span>
+          )}
           {isCheapest && (
             <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
               {lang === 'ar' ? 'الأوفر' : 'Cheapest'}
@@ -316,8 +352,9 @@ export default function App() {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 font-medium">
           <span className="flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 text-slate-400" />
-            {offer.branchName}
-            {offer.city ? `, ${offer.city}` : ''} ({offer.distanceKm} km {t.away})
+            {offer.branchName ?? t.onlineListing}
+            {offer.city ? `, ${offer.city}` : ''}
+            {offer.distanceKm === null ? ` (${t.distanceUnavailable})` : ` (${offer.distanceKm} km ${t.away})`}
           </span>
           {offer.address && <span>{offer.address}</span>}
           <span>•</span>
@@ -331,18 +368,25 @@ export default function App() {
       <div className="flex items-center justify-between sm:justify-end gap-4">
         <div className={isRTL ? 'text-left' : 'text-right'}>
           <div className="text-xs font-bold mb-0.5">
-            {offer.available ? (
+            {offer.available === true ? (
               <span className="text-emerald-600 flex items-center gap-1">
                 <CheckCircle2 className="w-3.5 h-3.5" /> {t.inStock}
               </span>
-            ) : (
+            ) : offer.available === false ? (
               <span className="text-rose-500 flex items-center gap-1">
                 <XCircle className="w-3.5 h-3.5" /> {t.outOfStock}
+              </span>
+            ) : (
+              <span className="text-amber-600 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" /> {t.availabilityUnknown}
               </span>
             )}
           </div>
           <div className="text-base font-black text-slate-900">
-            {offer.price} <span className="text-xs font-semibold text-slate-500">{t.egp}</span>
+            {offer.price === null ? t.priceUnavailable : <>{offer.price} <span className="text-xs font-semibold text-slate-500">{offer.currency}</span></>}
+          </div>
+          <div className="text-[10px] font-medium text-slate-500">
+            {offer.dataStatus === 'live' ? `${t.liveVerified} — ${t.checked} ${offer.lastChecked}` : t.catalogMayChange}
           </div>
         </div>
 
@@ -513,6 +557,10 @@ export default function App() {
                 </button>
               ))}
             </div>
+
+            <div className="pt-4">
+              <AiAssistant lang={lang} location={location} />
+            </div>
           </div>
         </main>
       )}
@@ -589,6 +637,8 @@ export default function App() {
           </aside>
 
           <main className="lg:col-span-3 space-y-5">
+            <AiAssistant lang={lang} location={location} />
+
             <div className="bg-gradient-to-r from-teal-800 via-cyan-800 to-sky-900 rounded-2xl p-5 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md shadow-cyan-900/10">
               <div className="space-y-1">
                 <div className="flex items-center gap-1.5 text-cyan-200 text-xs font-extrabold uppercase tracking-wider">
@@ -717,13 +767,17 @@ export default function App() {
                 <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
                   <Pill className="w-6 h-6" />
                 </div>
-                <h3 className="font-extrabold text-base text-slate-800">{t.noResultsTitle}</h3>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">{t.noResultsDesc}</p>
+                <h3 className="font-extrabold text-base text-slate-800">
+                  {dataStatus === 'live_checked_no_match' ? t.noLiveResults : t.noResultsTitle}
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  {dataStatus === 'live_checked_no_match' ? freshnessNote : t.noResultsDesc}
+                </p>
                 {(aiAssist.status === 'no_candidates' || aiAssist.status === 'error') && (
                   <p className="text-[11px] text-slate-400 max-w-sm mx-auto">
                     {lang === 'ar'
                       ? 'تم فحص الاستعلام بمساعدة الذكاء الاصطناعي ولم يُعثر على تطابق في الكتالوج.'
-                      : 'Claude also reviewed this query and found no confident catalog match.'}
+                      : 'No connected pharmacy returned a live match.'}
                   </p>
                 )}
               </div>
@@ -804,7 +858,7 @@ export default function App() {
                     {isExpanded && (
                       <div className="divide-y divide-slate-100">
                         {offers.map((offer) =>
-                          renderOfferRow(offer, offer.available && offer.price === cheapestPrice)
+                          renderOfferRow(offer, offer.available === true && offer.price === cheapestPrice)
                         )}
                       </div>
                     )}

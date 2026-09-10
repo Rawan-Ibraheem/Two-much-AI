@@ -10,6 +10,9 @@ const { mockMedicines } = require('./mock-medicines');
 const { branches: branchDirectory, describeBranch } = require('./pharmacy-directory');
 const { normalizeSearchText, matchesSearch } = require('./ai/medicine-matcher');
 const { getRecommendations } = require('./ai/medical/recommender');
+const { searchLiveSources } = require('./pharmacy-connectors');
+const { startHourlyRefresh } = require('./pharmacy-refresh');
+const cachedPharmacyData = require('./data/cached-pharmacy-data.json');
 const execFileAsync = promisify(execFile);
 
 // Minimal .env reader. The backend is intentionally dependency-light, so rather
@@ -103,6 +106,19 @@ function sendJson(response, statusCode, body) {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
   });
   response.end(JSON.stringify(body));
+}
+
+function cachedOffersForQuery(query) {
+  const normalizedQuery = normalizeSearchText(query);
+  return cachedPharmacyData
+    .filter((entry) => matchesSearch(
+      { name: entry.name, ingredient: '', searchTerms: [] },
+      normalizedQuery
+    ))
+    .map((entry) => ({
+      ...entry,
+      checkedAt: entry.downloadedAt
+    }));
 }
 
 function readJsonBody(request, maxBytes = 1_000_000) {
@@ -355,7 +371,21 @@ function createServer() {
     }
 
     if (request.method === 'GET' && requestUrl.pathname === '/api/pharmacy-sources') {
-      return sendJson(response, 200, { sources: sourceRegistry });
+      return sendJson(response, 200, {
+        sources: sourceRegistry.map((source) => ({
+          ...source,
+          connectorStatus: source.status,
+          searchable: source.capability === 'public_api' && source.connector !== null,
+          lastError: source.lastError ?? null,
+          cachedCatalogAvailable: cachedPharmacyData.some((entry) => entry.sourceId === source.id),
+          cachedCatalogDownloadedAt: cachedPharmacyData
+            .filter((entry) => entry.sourceId === source.id)
+            .map((entry) => entry.downloadedAt)
+            .sort()
+            .at(-1) ?? null,
+          cachedProductCount: cachedPharmacyData.filter((entry) => entry.sourceId === source.id).length
+        }))
+      });
     }
 
     if (requestUrl.pathname === '/api/medicines') {
@@ -378,6 +408,55 @@ function createServer() {
         lastChecked: new Date().toISOString(),
         results: search.results
       });
+    }
+
+    // Real, live pharmacy search - queries only the sources with a verified
+    // public search endpoint (see pharmacy-sources.js `capability`), never
+    // the demo/mock catalog above. An offer only appears here if it came
+    // back in that source's own live response.
+    if (request.method === 'GET' && requestUrl.pathname === '/api/medicines/live') {
+      const originalQuery = (requestUrl.searchParams.get('q') || '').trim();
+      if (!originalQuery) {
+        return sendJson(response, 400, { error: 'q is required for a live pharmacy search.' });
+      }
+
+      return searchLiveSources(originalQuery)
+        .then((sourceResults) => {
+          const sourcesSummary = sourceResults.map((result) => {
+            const registryEntry = sourceRegistry.find((source) => source.id === result.sourceId);
+            return {
+              sourceId: result.sourceId,
+              name: registryEntry?.name || result.sourceId,
+              status: result.status,
+              error: result.error || null,
+              checkedAt: result.checkedAt
+            };
+          });
+
+          const liveOffers = sourceResults
+            .filter((result) => result.status === 'ok')
+            .flatMap((result) => result.offers.map((offer) => ({
+              ...offer,
+              dataStatus: 'real_live_verified',
+              checkedAt: result.checkedAt,
+              verificationStatus: 'live_verified'
+            })));
+          const cachedOffers = cachedOffersForQuery(originalQuery);
+          const offers = [...liveOffers, ...cachedOffers];
+
+          return sendJson(response, 200, {
+            query: originalQuery,
+            dataSource: 'real_pharmacy_website_and_public_cache',
+            dataStatus: liveOffers.length
+              ? (cachedOffers.length ? 'live_and_cached' : 'live_verified')
+              : (cachedOffers.length ? 'cached_only' : 'live_checked_no_match'),
+            note: 'Live offers came from connected pharmacy websites. Cached offers came from public catalog URLs and may have changed; they are never presented as live.',
+            sources: sourcesSummary,
+            count: offers.length,
+            offers
+          });
+        })
+        .catch((error) => sendJson(response, 502, { error: error.message }));
     }
 
     if (request.method === 'POST' && requestUrl.pathname === '/api/search/coverage') {
@@ -519,9 +598,10 @@ function createServer() {
 
 if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
+  startHourlyRefresh();
   createServer().listen(port, () => {
     console.log(`Medicine search API listening on http://localhost:${port}`);
   });
 }
 
-module.exports = { createServer, medicines };
+module.exports = { createServer, medicines, cachedOffersForQuery };

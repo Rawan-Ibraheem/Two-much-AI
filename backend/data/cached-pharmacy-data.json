@@ -1,0 +1,41 @@
+[
+  {
+    "sourceId": "seif",
+    "pharmacy": "Seif Pharmacy",
+    "name": "Panadol Extra 24 Tab",
+    "price": null,
+    "currency": "EGP",
+    "available": null,
+    "productUrl": "https://seif-online.com/en/panadol-extra-24-tab",
+    "sourceUrl": "https://seif-online.com/sitemap_products_en.xml",
+    "downloadedAt": "2026-09-10T00:00:00.000Z",
+    "dataStatus": "cached",
+    "verificationStatus": "not_live"
+  },
+  {
+    "sourceId": "seif",
+    "pharmacy": "Seif Pharmacy",
+    "name": "Nexium 40 mg 28 Tab",
+    "price": null,
+    "currency": "EGP",
+    "available": null,
+    "productUrl": "https://seif-online.com/en/nexium-40-mg-28-tab-294881",
+    "sourceUrl": "https://seif-online.com/sitemap_products_en.xml",
+    "downloadedAt": "2026-09-10T00:00:00.000Z",
+    "dataStatus": "cached",
+    "verificationStatus": "not_live"
+  },
+  {
+    "sourceId": "seif",
+    "pharmacy": "Seif Pharmacy",
+    "name": "Brufen 400 mg 30 Tab",
+    "price": null,
+    "currency": "EGP",
+    "available": null,
+    "productUrl": "https://seif-online.com/en/brufen-400-mg-30-tab",
+    "sourceUrl": "https://seif-online.com/sitemap_products_en.xml",
+    "downloadedAt": "2026-09-10T00:00:00.000Z",
+    "dataStatus": "cached",
+    "verificationStatus": "not_live"
+  }
+]
