@@ -2,6 +2,11 @@ const http = require('node:http');
 const { URL } = require('node:url');
 
 const checkedRecently = new Date().toISOString();
+const branchCoordinates = {
+  'El Ezaby: Dokki': { latitude: 30.0381, longitude: 31.2118 },
+  'Seif Pharmacy: Mohandessin': { latitude: 30.0488, longitude: 31.2016 },
+  '19011 Pharmacy: Agouza': { latitude: 30.0309, longitude: 31.2152 }
+};
 
 const medicines = [
   {
@@ -84,10 +89,36 @@ function readJsonBody(request) {
   });
 }
 
+function getLocation(requestUrl) {
+  const latitudeValue = requestUrl.searchParams.get('lat');
+  const longitudeValue = requestUrl.searchParams.get('lon');
+  if (latitudeValue === null && longitudeValue === null) return null;
+
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return { error: 'lat and lon must be valid geographic coordinates.' };
+  }
+  return { latitude, longitude };
+}
+
+function distanceInKm(from, to) {
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const latitudeDelta = radians(to.latitude - from.latitude);
+  const longitudeDelta = radians(to.longitude - from.longitude);
+  const latitude = radians(from.latitude);
+  const targetLatitude = radians(to.latitude);
+  const haversine = Math.sin(latitudeDelta / 2) ** 2
+    + Math.cos(latitude) * Math.cos(targetLatitude) * Math.sin(longitudeDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
 function searchMedicines(requestUrl) {
   const query = (requestUrl.searchParams.get('q') || '').trim().toLowerCase();
   const availableOnly = requestUrl.searchParams.get('availableOnly') === 'true';
   const sort = requestUrl.searchParams.get('sort') || 'best-match';
+  const location = getLocation(requestUrl);
+  if (location?.error) return { error: location.error };
   const results = medicines
     .filter((medicine) => {
       const matchesQuery = !query || `${medicine.name} ${medicine.ingredient}`.toLowerCase().includes(query);
@@ -96,7 +127,12 @@ function searchMedicines(requestUrl) {
     })
     .map((medicine) => ({
       ...medicine,
-      offers: availableOnly ? medicine.offers.filter((offer) => offer.available) : medicine.offers
+      offers: (availableOnly ? medicine.offers.filter((offer) => offer.available) : medicine.offers).map((offer) => ({
+        ...offer,
+        distanceKm: location
+          ? Number(distanceInKm(location, branchCoordinates[`${offer.pharmacy}: ${offer.branch}`]).toFixed(2))
+          : offer.distanceKm
+      }))
     }));
 
   if (sort === 'cheapest') {
@@ -105,7 +141,7 @@ function searchMedicines(requestUrl) {
     results.sort((left, right) => Math.min(...left.offers.map((offer) => offer.distanceKm)) - Math.min(...right.offers.map((offer) => offer.distanceKm)));
   }
 
-  return { query, sort, availableOnly, results };
+  return { query, sort, availableOnly, location, results };
 }
 
 function buildCoverage(items) {
@@ -171,15 +207,17 @@ function createServer() {
     }
 
     if (requestUrl.pathname === '/api/medicines') {
-      const { query, sort, availableOnly, results } = searchMedicines(requestUrl);
+      const search = searchMedicines(requestUrl);
+      if (search.error) return sendJson(response, 400, { error: search.error });
 
       return sendJson(response, 200, {
-        query,
-        sort,
-        availableOnly,
-        count: results.length,
+        query: search.query,
+        sort: search.sort,
+        availableOnly: search.availableOnly,
+        location: search.location,
+        count: search.results.length,
         lastChecked: new Date().toISOString(),
-        results
+        results: search.results
       });
     }
 

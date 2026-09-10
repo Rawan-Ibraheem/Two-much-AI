@@ -4,6 +4,9 @@ const resultsElement = document.querySelector('#results');
 const statusElement = document.querySelector('#status');
 const coverageButton = document.querySelector('#coverage-button');
 const coverageElement = document.querySelector('#coverage');
+const locationButton = document.querySelector('#location-button');
+const locationStatus = document.querySelector('#location-status');
+let userLocation = null;
 
 function setStatus(message, state = '') {
   statusElement.textContent = message;
@@ -51,6 +54,10 @@ async function search(event) {
     sort: formData.get('sort'),
     availableOnly: document.querySelector('#available-only').checked ? 'true' : 'false'
   });
+  if (userLocation) {
+    params.set('lat', userLocation.latitude);
+    params.set('lon', userLocation.longitude);
+  }
 
   try {
     const response = await fetch(`${apiUrl}/api/medicines?${params}`);
@@ -62,6 +69,26 @@ async function search(event) {
     renderResults([]);
     setStatus(error.message, 'error');
   }
+}
+
+function useLocation() {
+  if (!navigator.geolocation) {
+    locationStatus.textContent = 'Location is not supported by this browser';
+    return;
+  }
+  locationStatus.textContent = 'Requesting location...';
+  navigator.geolocation.getCurrentPosition(
+    ({ coords }) => {
+      userLocation = { latitude: coords.latitude, longitude: coords.longitude };
+      locationStatus.textContent = 'Location enabled for nearest results';
+      setStatus('Location enabled. Search to calculate distances from you.');
+    },
+    () => {
+      locationStatus.textContent = 'Location permission was not granted';
+      setStatus('Location was not enabled. Search still works without it.', 'error');
+    },
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+  );
 }
 
 async function findCoverage() {
@@ -93,3 +120,4 @@ async function findCoverage() {
 
 searchForm.addEventListener('submit', search);
 coverageButton.addEventListener('click', findCoverage);
+locationButton.addEventListener('click', useLocation);

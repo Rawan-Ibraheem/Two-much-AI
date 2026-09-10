@@ -50,6 +50,34 @@ test('medicine search supports cheapest sorting and available-only filtering', a
   assert.ok(body.results.every((medicine) => medicine.offers.every((offer) => offer.available)));
 });
 
+test('nearest sorting uses the optional user location', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?sort=nearest&lat=30.038&lon=31.212`);
+  const body = await response.json();
+  const firstOffer = body.results[0].offers[0];
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.location, { latitude: 30.038, longitude: 31.212 });
+  assert.equal(body.results[0].name, 'Panadol Extra');
+  assert.ok(firstOffer.distanceKm < 1);
+});
+
+test('search rejects incomplete or invalid coordinates', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?lat=91&lon=31`);
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), {
+    error: 'lat and lon must be valid geographic coordinates.'
+  });
+});
+
 test('coverage identifies a pharmacy branch with every requested medicine', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());

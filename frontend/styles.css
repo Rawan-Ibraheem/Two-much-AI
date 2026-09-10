@@ -87,6 +87,28 @@ select {
   gap: 0.35rem;
 }
 
+.location-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-top: 1rem;
+  color: #59645e;
+  font: 0.82rem ui-sans-serif, system-ui, sans-serif;
+}
+
+.secondary-button {
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+  color: #286044;
+  background: transparent;
+}
+
+.secondary-button:hover,
+.secondary-button:focus-visible {
+  color: #fffdf9;
+  background: #286044;
+}
+
 input,
 button {
   min-height: 3.2rem;
@@ -225,6 +247,11 @@ button:focus-visible {
   }
 
   .filters {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .location-row {
     align-items: flex-start;
     flex-direction: column;
   }
