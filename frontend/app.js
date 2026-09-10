@@ -6,6 +6,8 @@ const coverageButton = document.querySelector('#coverage-button');
 const coverageElement = document.querySelector('#coverage');
 const locationButton = document.querySelector('#location-button');
 const locationStatus = document.querySelector('#location-status');
+const researchStatus = document.querySelector('#research-status');
+const researchResults = document.querySelector('#research-results');
 let userLocation = null;
 
 function setStatus(message, state = '') {
@@ -81,7 +83,10 @@ function useLocation() {
     ({ coords }) => {
       userLocation = { latitude: coords.latitude, longitude: coords.longitude };
       locationStatus.textContent = 'Location enabled for nearest results';
-      setStatus('Location enabled. Search to calculate distances from you.');
+      setStatus('Location enabled. Checking nearby pharmacy sources...');
+      if (document.querySelector('#query').value.trim()) {
+        search(new Event('submit')).then(researchNearby);
+      }
     },
     () => {
       locationStatus.textContent = 'Location permission was not granted';
@@ -89,6 +94,41 @@ function useLocation() {
     },
     { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
   );
+}
+
+function renderResearch(body) {
+  researchStatus.textContent = `${body.results.length} medicine result${body.results.length === 1 ? '' : 's'} checked within ${body.radiusKm} km. ${body.sourcePolicy}`;
+  researchResults.replaceChildren();
+  for (const result of body.results) {
+    const card = document.createElement('article');
+    card.className = 'research-card';
+    card.innerHTML = `<h3>${result.medicineName}</h3>${result.offers.map((offer) => `
+      <p><strong>${offer.pharmacy}, ${offer.branch}</strong> · ${offer.price} ${offer.currency} · ${offer.distanceKm} km
+        <span class="availability ${offer.available ? 'is-available' : 'is-unavailable'}">${offer.available ? 'Available' : 'Unavailable'}</span>
+        <br><small>${offer.source.verificationStatus} · checked ${new Date(offer.checkedAt).toLocaleTimeString()}</small>
+      </p>`).join('')}`;
+    researchResults.append(card);
+  }
+}
+
+async function researchNearby() {
+  if (!userLocation) return;
+  const query = document.querySelector('#query').value.trim();
+  researchStatus.textContent = 'Checking nearby pharmacy sources...';
+  try {
+    const response = await fetch(`${apiUrl}/api/research/availability`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, location: userLocation, radiusKm: 10 })
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'Pharmacy research failed.');
+    renderResearch(body);
+    setStatus('Nearby pharmacy research completed.');
+  } catch (error) {
+    researchStatus.textContent = error.message;
+    setStatus('Pharmacy research failed.', 'error');
+  }
 }
 
 async function findCoverage() {

@@ -7,6 +7,11 @@ const branchCoordinates = {
   'Seif Pharmacy: Mohandessin': { latitude: 30.0488, longitude: 31.2016 },
   '19011 Pharmacy: Agouza': { latitude: 30.0309, longitude: 31.2152 }
 };
+const pharmacySources = {
+  'El Ezaby: Dokki': { connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/dokki', verificationStatus: 'unverified' },
+  'Seif Pharmacy: Mohandessin': { connector: 'mock-public-catalog', sourceUrl: 'mock://seif/mohandessin', verificationStatus: 'unverified' },
+  '19011 Pharmacy: Agouza': { connector: 'mock-public-catalog', sourceUrl: 'mock://19011/agouza', verificationStatus: 'unverified' }
+};
 
 const medicines = [
   {
@@ -183,6 +188,38 @@ function buildCoverage(items) {
     .sort((left, right) => Number(right.complete) - Number(left.complete) || left.totalPrice - right.totalPrice);
 }
 
+function researchAvailability({ query, location, radiusKm }) {
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  const medicinesToResearch = medicines.filter((medicine) =>
+    !normalizedQuery || `${medicine.name} ${medicine.ingredient}`.toLowerCase().includes(normalizedQuery)
+  );
+  const results = medicinesToResearch.map((medicine) => ({
+    medicineId: medicine.id,
+    medicineName: medicine.name,
+    offers: medicine.offers
+      .map((offer) => {
+        const branchKey = `${offer.pharmacy}: ${offer.branch}`;
+        const distanceKm = Number(distanceInKm(location, branchCoordinates[branchKey]).toFixed(2));
+        return {
+          ...offer,
+          distanceKm,
+          source: pharmacySources[branchKey],
+          checkedAt: checkedRecently
+        };
+      })
+      .filter((offer) => offer.distanceKm <= radiusKm)
+  })).filter((result) => result.offers.length > 0);
+
+  return {
+    mode: 'research',
+    query: normalizedQuery,
+    radiusKm,
+    location,
+    sourcePolicy: 'Mock public catalog only; live scraping requires an approved source URL and connector.',
+    results
+  };
+}
+
 function createServer() {
   return http.createServer((request, response) => {
     const requestUrl = new URL(request.url, 'http://localhost');
@@ -197,8 +234,8 @@ function createServer() {
     }
 
     if (request.method !== 'GET') {
-      if (request.method !== 'POST' || requestUrl.pathname !== '/api/search/coverage') {
-        return sendJson(response, 405, { error: 'Only GET and coverage POST requests are supported.' });
+      if (request.method !== 'POST' || !['/api/search/coverage', '/api/research/availability'].includes(requestUrl.pathname)) {
+        return sendJson(response, 405, { error: 'Only GET and supported POST requests are accepted.' });
       }
     }
 
@@ -236,6 +273,28 @@ function createServer() {
             requestedMedicineIds: requestedIds,
             candidates: buildCoverage(requestedIds)
           });
+        })
+        .catch((error) => sendJson(response, 400, { error: error.message }));
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/research/availability') {
+      return readJsonBody(request)
+        .then((body) => {
+          const location = body.location;
+          const latitude = Number(location?.latitude);
+          const longitude = Number(location?.longitude);
+          const radiusKm = Number(body.radiusKm ?? 10);
+          if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+            return sendJson(response, 400, { error: 'A valid location is required for pharmacy research.' });
+          }
+          if (!Number.isFinite(radiusKm) || radiusKm <= 0 || radiusKm > 50) {
+            return sendJson(response, 400, { error: 'radiusKm must be between 0 and 50.' });
+          }
+          return sendJson(response, 200, researchAvailability({
+            query: body.query,
+            location: { latitude, longitude },
+            radiusKm
+          }));
         })
         .catch((error) => sendJson(response, 400, { error: error.message }));
     }

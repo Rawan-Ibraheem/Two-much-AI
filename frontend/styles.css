@@ -222,6 +222,47 @@ button:focus-visible {
   margin-top: 2rem;
 }
 
+.research {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #cfdbd1;
+}
+
+.research h2 {
+  margin: 0 0 0.35rem;
+  color: #173326;
+  font-size: 1.35rem;
+}
+
+#research-status {
+  margin: 0;
+  color: #59645e;
+  font: 0.82rem/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+
+.research-card {
+  margin-top: 0.8rem;
+  padding: 1rem;
+  border-left: 3px solid #b9c8bc;
+  background: rgba(255, 253, 249, 0.6);
+}
+
+.research-card h3 {
+  margin: 0 0 0.45rem;
+  color: #173326;
+  font: 700 1rem ui-sans-serif, system-ui, sans-serif;
+}
+
+.research-card p {
+  margin: 0.45rem 0 0;
+  color: #59645e;
+  font: 0.84rem/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+
+.research-card small {
+  color: #8b5e34;
+}
+
 .coverage-card {
   display: flex;
   flex-wrap: wrap;

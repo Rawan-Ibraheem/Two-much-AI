@@ -78,6 +78,46 @@ test('search rejects incomplete or invalid coordinates', async (t) => {
   });
 });
 
+test('pharmacy research returns nearby source and freshness metadata', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/research/availability`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query: 'paracetamol',
+      location: { latitude: 30.038, longitude: 31.212 },
+      radiusKm: 2
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.mode, 'research');
+  assert.equal(body.results.length, 2);
+  assert.ok(body.results.every((result) => result.offers.length > 0));
+  assert.equal(body.results[0].offers[0].source.connector, 'mock-public-catalog');
+  assert.equal(body.results[0].offers[0].source.verificationStatus, 'unverified');
+  assert.ok(body.results[0].offers[0].checkedAt);
+});
+
+test('pharmacy research requires a valid location and radius', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/research/availability`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: 'Panadol', location: { latitude: 30, longitude: 31 }, radiusKm: 100 })
+  });
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(await response.json(), { error: 'radiusKm must be between 0 and 50.' });
+});
+
 test('coverage identifies a pharmacy branch with every requested medicine', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());
