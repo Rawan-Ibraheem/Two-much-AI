@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Medicine Search Demo</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">Backend smoke test</p>
+      <h1>Find a medicine</h1>
+      <p class="intro">Search the mock pharmacy catalog, compare offers, and check whether one branch covers your list.</p>
+
+      <section class="ocr-panel" aria-labelledby="ocr-heading">
+        <p class="eyebrow">Document analysis</p>
+        <h2 id="ocr-heading">Read a medicine receipt</h2>
+        <p class="panel-copy">Analyze receipt text, review every medicine, then find one pharmacy branch for the confirmed list.</p>
+        <label for="receipt-file">Receipt file</label>
+        <input id="receipt-file" type="file" accept=".txt,.json,image/*">
+        <label for="ocr-text">Receipt text for testing</label>
+        <textarea id="ocr-text" rows="4" placeholder="Panadol Extra 24 tablets&#10;بانادول اكسترا"></textarea>
+        <button id="analyze-button" class="secondary-button" type="button">Analyze receipt</button>
+        <p id="ocr-status" class="status" role="status"></p>
+        <div id="ocr-review" class="ocr-review" aria-live="polite"></div>
+        <button id="confirm-ocr-button" class="coverage-button" type="button" disabled>Confirm medicines and find one pharmacy</button>
+      </section>
+
+      <form id="search-form" class="search-form">
+        <label for="query">Medicine or active ingredient</label>
+        <div class="search-row">
+          <input id="query" name="q" type="search" placeholder="Try Panadol or paracetamol" required>
+          <button type="submit">Search</button>
+        </div>
+        <div class="filters">
+          <label for="sort">Sort</label>
+          <select id="sort" name="sort">
+            <option value="best-match">Best match</option>
+            <option value="cheapest">Cheapest</option>
+            <option value="nearest">Nearest</option>
+          </select>
+          <label class="check-label" for="available-only">
+            <input id="available-only" type="checkbox">
+            Available only
+          </label>
+        </div>
+        <div class="location-row">
+          <button id="location-button" class="secondary-button" type="button">Use my location</button>
+          <span id="location-status">Location is off</span>
+        </div>
+        <div class="manual-location">
+          <label for="latitude">Latitude</label>
+          <input id="latitude" type="number" step="any" placeholder="30.038">
+          <label for="longitude">Longitude</label>
+          <input id="longitude" type="number" step="any" placeholder="31.212">
+          <button id="demo-location-button" class="secondary-button" type="button">Use demo location</button>
+        </div>
+      </form>
+
+      <p id="status" class="status" role="status"></p>
+      <section id="results" class="results" aria-live="polite"></section>
+      <section id="research" class="research" aria-live="polite">
+        <h2>Nearby pharmacy research</h2>
+        <p id="research-status">Allow location to check nearby pharmacy sources.</p>
+        <div id="research-results"></div>
+      </section>
+      <button id="coverage-button" class="coverage-button" type="button" disabled>Find one branch for selected medicines</button>
+      <section id="coverage" class="coverage" aria-live="polite"></section>
+
+      <a class="health-link" href="http://localhost:3000/api/health" target="_blank" rel="noreferrer">Check API health</a>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

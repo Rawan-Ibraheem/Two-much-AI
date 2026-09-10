@@ -1,0 +1,16 @@
+{
+  "name": "medicine-search-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Node.js REST API for the medicine search hackathon demo",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check mock-medicines.js && node --check pharmacy-sources.js"
+  }
+}
