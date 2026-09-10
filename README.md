@@ -1,32 +1,40 @@
 # DawaaFinder
 
-Medicine **price and availability comparison for Egypt** — search for a medicine
-in Arabic, English or Franco Arabic and see which pharmacy branches carry it,
-what they charge, how far away they are and when the data was last checked.
+DawaaFinder is a medicine search and comparison app for Egypt. It helps users look up a medicine in Arabic, English, or Franco-Arabic and compare pharmacies by price, branch availability, distance, and freshness of the data.
 
-Hackathon project. Requirements live in [`shared/SKILLS.md`](./shared/SKILLS.md).
+This repository contains the product UI, the backend API, a separate NestJS prototype, and the project requirements that define the product constraints.
+
+## Project goals
+
+- Search medicines using Arabic, English, and Franco-Arabic variants
+- Compare pharmacy offers across branches
+- Sort results by best match, price, distance, or freshness
+- Surface data-source and verification labels to keep the app honest
+- Support research and availability checks without pretending the data is live
+
+Requirements and product constraints live in [shared/SKILLS.md](./shared/SKILLS.md).
 
 ## Repository layout
 
-| Path | What's in it |
-|---|---|
-| [`frontend/dawaa-finder/`](./frontend/dawaa-finder) | **The product UI.** React + Vite + TypeScript + Tailwind. Bilingual (AR/EN) with RTL. Talks to the API below. |
-| [`backend/`](./backend) | **The running API.** Dependency-light Node HTTP server (`server.js`). Bilingual, typo-tolerant search, distance ranking, research mode, Claude-assisted query normalization. [Setup + endpoints](./backend/README.md). |
-| [`backend/nest/`](./backend/nest) | Parallel **NestJS + Postgres** track with real Talabat price data. Not wired into the demo, and its `npm install` does not currently complete — see [its README](./backend/nest/README.md). |
-| [`frontend/`](./frontend) | Plain-HTML API harness (`index.html` + `app.js`). Exercises every endpoint directly, including the receipt-OCR and branch-coverage flows the React UI doesn't surface. |
-| [`shared/SKILLS.md`](./shared/SKILLS.md) | Project requirements and conventions. |
+| Path                                              | Description                                                                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [frontend/dawaa-finder/](./frontend/dawaa-finder) | React + Vite + TypeScript UI for the main product experience. Includes bilingual English/Arabic support and RTL layout.                                                                          |
+| [backend/](./backend)                             | Node.js API used by the product. Includes typo-tolerant search, distance ranking, research mode, and optional Claude-assisted query normalization. See [backend/README.md](./backend/README.md). |
+| [backend/nest/](./backend/nest)                   | Separate NestJS + Postgres track with Talabat data snapshot. Not wired into the demo flow. See [backend/nest/README.md](./backend/nest/README.md).                                               |
+| [frontend/](./frontend)                           | Static HTML harness used to exercise API endpoints directly, including the OCR and branch-coverage flows.                                                                                        |
+| [shared/SKILLS.md](./shared/SKILLS.md)            | Project requirements, guardrails, and product conventions.                                                                                                                                       |
 
 ## Quick start
 
-Two terminals:
+Run the API and UI in two terminals:
 
 ```bash
-# 1. API on http://localhost:3000  (no install and no database needed)
+# Terminal 1: API on http://localhost:3000
 npm --prefix backend start
 ```
 
 ```bash
-# 2. UI on http://localhost:5173
+# Terminal 2: UI on http://localhost:5173
 cd frontend/dawaa-finder
 npm install
 npm run dev
@@ -34,34 +42,35 @@ npm run dev
 
 Then open <http://localhost:5173> and search for `Panadol Extra`.
 
-To enable Claude-assisted query normalization, put an `ANTHROPIC_API_KEY` in
-`backend/.env` or `shared/.env` (both are git-ignored) — see
-[`backend/.env.example`](./backend/.env.example). Search works without it.
+To enable Claude-assisted query normalization, add `ANTHROPIC_API_KEY` to `backend/.env` or `shared/.env` (both are git-ignored). A sample file is available at [backend/.env.example](./backend/.env.example). Search still works without it.
 
-## Tests
+## Testing
 
 ```bash
-npm --prefix backend test                        # 22 API tests
-cd frontend/dawaa-finder && npm run smoke        # 16 end-to-end DOM checks
+npm --prefix backend test
+cd frontend/dawaa-finder && npm run smoke
 ```
 
-The smoke test boots the real API, loads the built frontend bundle in jsdom and
-asserts that API data reaches the DOM.
+The backend test suite covers API behavior, and the frontend smoke test boots the real API and validates that data reaches the DOM correctly.
 
 ## Data honesty
 
-Pharmacy offers in `backend/` are **demo data**, not a live pharmacy feed. The
-API labels every response (`dataSource: "demo_catalog"`, `verificationStatus:
-"unverified"`) and the UI surfaces that label, because presenting unverified
-stock as freshly verified is explicitly out of bounds in `shared/SKILLS.md`.
-Branch coordinates and pharmacy hotlines are real, so distance ranking and the
-call/map actions behave like the finished product.
+The demo data in [backend/](./backend) is not a live pharmacy feed. Responses are labeled with values such as `dataSource: "demo_catalog"` and `verificationStatus: "unverified"`, and the UI surfaces those labels. This is intentional and is required by the project guardrails in [shared/SKILLS.md](./shared/SKILLS.md).
 
-`backend/nest/` holds real EGP prices captured from Talabat storefronts on
-2026-09-10 — a point-in-time snapshot, also not a live sync.
+Branch coordinates and pharmacy hotlines are real, so distance ranking and map/call actions behave like a finished product. However, prices and availability are synthetic and should not be presented as live-verified stock.
 
-## Not built yet
+The NestJS prototype in [backend/nest/](./backend/nest) contains a real Talabat price snapshot captured on 2026-09-10, but it is also not a live sync.
 
-Authentication, admin dashboard, dedicated medicine/pharmacy detail pages,
-embedded map view, live pharmacy scrapers, pgvector semantic search, and the
-BullMQ/Redis job queue. See the audit notes in `backend/README.md`.
+## Not yet built
+
+The project intentionally does not include:
+
+- authentication
+- admin dashboard
+- dedicated medicine and pharmacy detail pages
+- embedded map experience
+- live pharmacy scraping
+- pgvector semantic search
+- BullMQ/Redis job queue
+
+See [backend/README.md](./backend/README.md) for the audit notes and implementation details.
