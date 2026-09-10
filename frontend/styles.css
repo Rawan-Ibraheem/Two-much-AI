@@ -290,6 +290,13 @@ button:focus-visible {
   color: #8b5e34;
 }
 
+.source-link {
+  display: inline-block;
+  margin-top: 0.2rem;
+  color: #286044;
+  font-weight: 700;
+}
+
 .coverage-card {
   display: flex;
   flex-wrap: wrap;

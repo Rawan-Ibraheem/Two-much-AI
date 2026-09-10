@@ -131,6 +131,7 @@ function renderResearch(body) {
       <p><strong>${offer.pharmacy}, ${offer.branch}</strong> · ${offer.price} ${offer.currency} · ${offer.distanceKm} km
         <span class="availability ${offer.available ? 'is-available' : 'is-unavailable'}">${offer.available ? 'Available' : 'Unavailable'}</span>
         <br><small>${offer.source.verificationStatus} · checked ${new Date(offer.checkedAt).toLocaleTimeString()}</small>
+        <br><a class="source-link" href="${offer.source.websiteUrl}" target="_blank" rel="noreferrer">Visit pharmacy website</a>
       </p>`).join('')}`;
     researchResults.append(card);
   }

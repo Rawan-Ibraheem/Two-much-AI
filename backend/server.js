@@ -204,7 +204,10 @@ function researchAvailability({ query, location, radiusKm }) {
         return {
           ...offer,
           distanceKm,
-          source: pharmacySources[branchKey],
+          source: {
+            ...pharmacySources[branchKey],
+            websiteUrl: sourceRegistry.find((source) => source.id === pharmacySources[branchKey].sourceId)?.websiteUrl
+          },
           checkedAt: checkedRecently
         };
       })
