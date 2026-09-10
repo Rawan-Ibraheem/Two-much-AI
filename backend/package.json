@@ -1,0 +1,11 @@
+{
+  "name": "medicine-search-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Small mock API for the medicine search hackathon demo",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  }
+}
