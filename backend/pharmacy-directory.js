@@ -1,42 +1,32 @@
 // Branch-level directory for the demo catalog.
 //
-// Coordinates are the real approximate locations of these Cairo/Giza districts,
+// Coordinates are approximate locations of these Alexandria districts,
 // so distance ranking is genuinely computed rather than hardcoded. Hotlines are
 // the pharmacies' public call-centre numbers. Availability and price, however,
 // are demo data - see `verificationStatus`.
 const { pharmacySources } = require('./pharmacy-sources');
 
 const branches = {
-  'El Ezaby: Dokki': {
+  'El Ezaby: Smouha': {
     pharmacy: 'El Ezaby',
-    branch: 'Dokki',
-    city: 'Giza',
-    governorate: 'Giza',
-    latitude: 30.0381,
-    longitude: 31.2118,
+    branch: 'Smouha',
+    city: 'Alexandria',
+    governorate: 'Alexandria',
+    latitude: 31.2150,
+    longitude: 29.9550,
     phone: '19600',
     sourceId: 'el-ezaby'
   },
-  'Seif Pharmacy: Mohandessin': {
+  'Seif Pharmacy: Sidi Gaber': {
     pharmacy: 'Seif Pharmacy',
-    branch: 'Mohandessin',
-    city: 'Giza',
-    governorate: 'Giza',
-    latitude: 30.0488,
-    longitude: 31.2016,
+    branch: 'Sidi Gaber',
+    city: 'Alexandria',
+    governorate: 'Alexandria',
+    latitude: 31.2440,
+    longitude: 29.9660,
     phone: '19199',
     sourceId: 'seif'
   },
-  '19011 Pharmacy: Agouza': {
-    pharmacy: '19011 Pharmacy',
-    branch: 'Agouza',
-    city: 'Giza',
-    governorate: 'Giza',
-    latitude: 30.0309,
-    longitude: 31.2152,
-    phone: '19011',
-    sourceId: '19011'
-  }
 };
 
 function branchKey(pharmacy, branch) {
@@ -63,6 +53,9 @@ function describeBranch(pharmacy, branch) {
   if (!record) return null;
   const source = pharmacySources.find((candidate) => candidate.id === record.sourceId);
   return {
+    // Null until a real street address is on record - the frontend renders it
+    // only when present, so nothing is invented to fill the field.
+    address: record.address ?? null,
     city: record.city,
     governorate: record.governorate,
     latitude: record.latitude,

@@ -24,7 +24,7 @@ import {
   searchMedicines,
   researchAvailability,
   requestBrowserLocation,
-  CAIRO_CENTRE
+  ALEXANDRIA_CENTRE
 } from './services/api';
 import type {
   AiAssist,
@@ -83,7 +83,7 @@ export default function App() {
       subBrand: 'Egypt demo',
       taglineBadge: 'Egyptian pharmacy price & availability comparison',
       heroTitle: 'Find medicine availability & prices across Egypt',
-      heroDesc: 'Compare demo branch stock and retail prices across Cairo and Giza pharmacies instead of calling ten of them.',
+      heroDesc: 'Compare demo branch stock and retail prices across Alexandria pharmacies instead of calling ten of them.',
       searchPlaceholder: 'Search for a medicine...',
       searchBtn: 'Search',
       tryPrompt: 'Try:',
@@ -128,7 +128,7 @@ export default function App() {
       subBrand: 'نسخة تجريبية',
       taglineBadge: 'مقارنة أسعار وتوفر الأدوية في مصر',
       heroTitle: 'اعرف مكان وسعر دوائك في مصر',
-      heroDesc: 'قارن الأسعار والتوفر بين صيدليات القاهرة والجيزة في ثوانٍ وبدون مكالمات هاتفية.',
+      heroDesc: 'قارن الأسعار والتوفر بين صيدليات الإسكندرية في ثوانٍ وبدون مكالمات هاتفية.',
       searchPlaceholder: 'ابحث عن دواء...',
       searchBtn: 'بحث',
       tryPrompt: 'أمثلة:',
@@ -239,8 +239,8 @@ export default function App() {
     } catch {
       // Denied or unavailable: fall back to a labelled default so "nearest"
       // still demonstrates real distance maths.
-      setLocation(CAIRO_CENTRE);
-      setLocationLabel(lang === 'ar' ? 'وسط القاهرة (افتراضي)' : 'Cairo centre (default)');
+      setLocation(ALEXANDRIA_CENTRE);
+      setLocationLabel(lang === 'ar' ? 'وسط الإسكندرية (افتراضي)' : 'Alexandria centre (default)');
     } finally {
       setIsLocating(false);
     }
@@ -258,9 +258,9 @@ export default function App() {
           setLocation(coords);
           setLocationLabel(lang === 'ar' ? 'موقعك الحالي' : 'Your current location');
         } catch {
-          coords = CAIRO_CENTRE;
+          coords = ALEXANDRIA_CENTRE;
           setLocation(coords);
-          setLocationLabel(lang === 'ar' ? 'وسط القاهرة (افتراضي)' : 'Cairo centre (default)');
+          setLocationLabel(lang === 'ar' ? 'وسط الإسكندرية (افتراضي)' : 'Alexandria centre (default)');
         }
       }
       setResearch(await researchAvailability({ query, location: coords }));
@@ -319,6 +319,7 @@ export default function App() {
             {offer.branchName}
             {offer.city ? `, ${offer.city}` : ''} ({offer.distanceKm} km {t.away})
           </span>
+          {offer.address && <span>{offer.address}</span>}
           <span>•</span>
           <span className="flex items-center gap-1">
             <Clock className="w-3.5 h-3.5 text-slate-400" />

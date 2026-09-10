@@ -8,12 +8,13 @@ const { URL } = require('node:url');
 const { pharmacySources: sourceRegistry } = require('./pharmacy-sources');
 const { mockMedicines } = require('./mock-medicines');
 const { branches: branchDirectory, describeBranch } = require('./pharmacy-directory');
-const aiNormalizer = require('./ai-normalizer');
+const { normalizeSearchText, matchesSearch } = require('./ai/medicine-matcher');
+const { getRecommendations } = require('./ai/medical/recommender');
 const execFileAsync = promisify(execFile);
 
 // Minimal .env reader. The backend is intentionally dependency-light, so rather
-// than pulling in dotenv we read the two files this project actually uses.
-// Secrets stay server-side; none of this is ever sent to the browser.
+// than pulling in dotenv we read `backend/.env` directly. Nothing read here is
+// ever sent to the browser.
 function loadEnvFile(envPath) {
   let contents;
   try {
@@ -31,7 +32,6 @@ function loadEnvFile(envPath) {
   }
 }
 loadEnvFile(path.join(__dirname, '.env'));
-loadEnvFile(path.join(__dirname, '..', 'shared', '.env'));
 
 const checkedRecently = new Date().toISOString();
 const branchCoordinates = Object.fromEntries(
@@ -41,9 +41,8 @@ const branchCoordinates = Object.fromEntries(
   ])
 );
 const pharmacySources = {
-  'El Ezaby: Dokki': { sourceId: 'el-ezaby', connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/dokki', verificationStatus: 'unverified' },
-  'Seif Pharmacy: Mohandessin': { sourceId: 'seif', connector: 'mock-public-catalog', sourceUrl: 'mock://seif/mohandessin', verificationStatus: 'unverified' },
-  '19011 Pharmacy: Agouza': { sourceId: '19011', connector: 'mock-public-catalog', sourceUrl: 'mock://19011/agouza', verificationStatus: 'unverified' }
+  'El Ezaby: Smouha': { sourceId: 'el-ezaby', connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/smouha', verificationStatus: 'unverified' },
+  'Seif Pharmacy: Sidi Gaber': { sourceId: 'seif', connector: 'mock-public-catalog', sourceUrl: 'mock://seif/sidi-gaber', verificationStatus: 'unverified' }
 };
 
 const baseMedicines = [
@@ -56,11 +55,11 @@ const baseMedicines = [
     searchTerms: ['panadol extra', 'بانادول اكسترا', 'بانادول إكسترا', 'paracetamol', 'باراسيتامول'],
     offers: [
       {
-        pharmacy: 'El Ezaby', branch: 'Dokki', price: 85, currency: 'EGP', available: true,
+        pharmacy: 'El Ezaby', branch: 'Smouha', price: 85, currency: 'EGP', available: true,
         distanceKm: 1.8, lastChecked: checkedRecently
       },
       {
-        pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 92, currency: 'EGP', available: true,
+        pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 92, currency: 'EGP', available: true,
         distanceKm: 3.2, lastChecked: checkedRecently
       }
     ]
@@ -74,13 +73,9 @@ const baseMedicines = [
     searchTerms: ['congestal', 'كونجستال', 'paracetamol', 'باراسيتامول'],
     offers: [
       {
-        pharmacy: 'El Ezaby', branch: 'Dokki', price: 48, currency: 'EGP', available: true,
+        pharmacy: 'El Ezaby', branch: 'Smouha', price: 48, currency: 'EGP', available: true,
         distanceKm: 1.8, lastChecked: checkedRecently
       },
-      {
-        pharmacy: '19011 Pharmacy', branch: 'Agouza', price: 52, currency: 'EGP', available: false,
-        distanceKm: 2.4, lastChecked: checkedRecently
-      }
     ]
   },
   {
@@ -92,7 +87,7 @@ const baseMedicines = [
     searchTerms: ['vitamin d3', 'فيتامين د', 'فيتامين د3', 'cholecalciferol'],
     offers: [
       {
-        pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 120, currency: 'EGP', available: true,
+        pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 120, currency: 'EGP', available: true,
         distanceKm: 3.2, lastChecked: checkedRecently
       }
     ]
@@ -195,48 +190,11 @@ function offerFreshness(offer) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeSearchText(value) {
-  return value
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/[ًٌٍَُِّْـ]/g, '')
-    .replace(/[إأآ]/g, 'ا')
-    .replace(/ى/g, 'ي')
-    .replace(/ة/g, 'ه')
-    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim();
-}
-
-function editDistance(left, right) {
-  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
-  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
-    let diagonal = row[0];
-    row[0] = leftIndex;
-    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
-      const previous = row[rightIndex];
-      row[rightIndex] = left[leftIndex - 1] === right[rightIndex - 1]
-        ? diagonal
-        : Math.min(diagonal, row[rightIndex - 1], previous) + 1;
-      diagonal = previous;
-    }
-  }
-  return row[right.length];
-}
-
-function matchesSearch(medicine, normalizedQuery) {
-  if (!normalizedQuery) return true;
-  const terms = [medicine.name, medicine.ingredient, ...(medicine.searchTerms || [])]
-    .map(normalizeSearchText);
-  if (terms.some((term) => term.includes(normalizedQuery))) return true;
-
-  const queryTokens = normalizedQuery.split(' ');
-  return queryTokens.every((queryToken) => terms.some((term) => term.split(' ').some((termToken) => {
-    if (queryToken.length < 4 || termToken.length < 4) return false;
-    const allowedDistance = queryToken.length >= 8 ? 2 : 1;
-    return editDistance(queryToken, termToken) <= allowedDistance;
-  })));
-}
+// normalizeSearchText and matchesSearch (Arabic/Franco/typo/strength-aware
+// deterministic matching) now live in ./ai/medicine-matcher, alongside
+// matchMedicine() which resolves a query to a single best medicine ID. This
+// endpoint keeps using matchesSearch directly since it needs to filter and
+// return the whole list of matching medicines, not just the best one.
 
 function extractMedicineRequests(text) {
   const lines = text.split(/\r?\n|[,;|]/).map((line) => line.trim()).filter(Boolean);
@@ -297,49 +255,6 @@ function searchMedicines(requestUrl) {
   }
 
   return { originalQuery, query, sort, availableOnly, location, results };
-}
-
-/**
- * Deterministic search runs first. Only when it finds nothing do we ask Claude
- * to reinterpret the query, and then we re-run the *same* deterministic matcher
- * against the catalog names it proposed. Claude can therefore widen recall but
- * can never fabricate a medicine, price or offer, and any failure (no key, no
- * network, bad JSON, timeout) leaves the original empty answer untouched.
- */
-async function searchMedicinesWithAi(requestUrl) {
-  const search = searchMedicines(requestUrl);
-  if (search.error || search.results.length > 0 || !search.originalQuery) return search;
-  if (!aiNormalizer.isConfigured()) {
-    return { ...search, aiAssist: { status: 'disabled' } };
-  }
-
-  const assist = await aiNormalizer.normalizeQuery(
-    search.originalQuery,
-    medicines.map((medicine) => medicine.name)
-  );
-  if (assist.candidates.length === 0) {
-    return { ...search, aiAssist: { status: assist.status, model: assist.model } };
-  }
-
-  const retryUrl = new URL(requestUrl.toString());
-  const matched = [];
-  for (const candidate of assist.candidates) {
-    retryUrl.searchParams.set('q', candidate);
-    for (const result of searchMedicines(retryUrl).results || []) {
-      if (!matched.some((existing) => existing.id === result.id)) matched.push(result);
-    }
-  }
-
-  return {
-    ...search,
-    results: matched,
-    aiAssist: {
-      status: matched.length ? 'matched' : 'no_candidates',
-      model: assist.model,
-      interpretation: assist.interpretation,
-      candidates: assist.candidates
-    }
-  };
 }
 
 function buildCoverage(items) {
@@ -430,7 +345,7 @@ function createServer() {
     }
 
     if (request.method !== 'GET') {
-      if (request.method !== 'POST' || !['/api/search/coverage', '/api/ocr/analyze', '/api/research/availability'].includes(requestUrl.pathname)) {
+      if (request.method !== 'POST' || !['/api/search/coverage', '/api/ocr/analyze', '/api/research/availability', '/api/assistant/recommend'].includes(requestUrl.pathname)) {
         return sendJson(response, 405, { error: 'Only GET and supported POST requests are accepted.' });
       }
     }
@@ -444,32 +359,25 @@ function createServer() {
     }
 
     if (requestUrl.pathname === '/api/medicines') {
-      return searchMedicinesWithAi(requestUrl)
-        .then((search) => {
-          if (search.error) return sendJson(response, 400, { error: search.error });
+      const search = searchMedicines(requestUrl);
+      if (search.error) return sendJson(response, 400, { error: search.error });
 
-          const aiMatched = search.aiAssist?.status === 'matched';
-          return sendJson(response, 200, {
-            query: search.query,
-            originalQuery: search.originalQuery,
-            sort: search.sort,
-            availableOnly: search.availableOnly,
-            location: search.location,
-            count: search.results.length,
-            dataStatus: search.results.length
-              ? (aiMatched ? 'ai_assisted_match' : 'catalog_match')
-              : 'catalog_only_no_match',
-            nextStep: search.results.length
-              ? 'Review offers and freshness before relying on availability.'
-              : 'Live pharmacy connectors are not active; add an approved source or API to search this medicine.',
-            aiAssist: search.aiAssist || { status: 'not_needed' },
-            dataSource: 'demo_catalog',
-            freshnessNote: 'Demo catalog offers. Prices and availability are not live-verified.',
-            lastChecked: new Date().toISOString(),
-            results: search.results
-          });
-        })
-        .catch((error) => sendJson(response, 500, { error: error.message }));
+      return sendJson(response, 200, {
+        query: search.query,
+        originalQuery: search.originalQuery,
+        sort: search.sort,
+        availableOnly: search.availableOnly,
+        location: search.location,
+        count: search.results.length,
+        dataStatus: search.results.length ? 'catalog_match' : 'catalog_only_no_match',
+        nextStep: search.results.length
+          ? 'Review offers and freshness before relying on availability.'
+          : 'Live pharmacy connectors are not active; add an approved source or API to search this medicine.',
+        dataSource: 'demo_catalog',
+        freshnessNote: 'Demo catalog offers. Prices and availability are not live-verified.',
+        lastChecked: new Date().toISOString(),
+        results: search.results
+      });
     }
 
     if (request.method === 'POST' && requestUrl.pathname === '/api/search/coverage') {
@@ -550,6 +458,61 @@ function createServer() {
         .catch((error) => sendJson(response, 400, { error: error.message }));
     }
 
+    if (request.method === 'POST' && requestUrl.pathname === '/api/assistant/recommend') {
+      return readJsonBody(request)
+        .then((body) => {
+          if (typeof body.message !== 'string' || !body.message.trim()) {
+            return sendJson(response, 400, { error: 'message is required.' });
+          }
+
+          let location = null;
+          if (body.location !== undefined && body.location !== null) {
+            const latitude = Number(body.location.latitude);
+            const longitude = Number(body.location.longitude);
+            if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+              return sendJson(response, 400, { error: 'location, if provided, must have valid latitude and longitude.' });
+            }
+            location = { latitude, longitude };
+          }
+
+          // The recommender only ever returns medicine IDs (or a
+          // needs_more_information/urgent status) - it never sees or invents
+          // pharmacy/offer data.
+          const outcome = getRecommendations(body.message, medicines);
+          if (outcome.status !== 'ok') {
+            return sendJson(response, 200, outcome);
+          }
+
+          // Resolve those IDs through the exact same per-medicine enrichment
+          // /api/medicines uses (strength/arabicName derivation, offer
+          // distance + branchInfo). This is not a second pharmacy search
+          // implementation, just the existing one applied to the medicine
+          // IDs the recommender picked.
+          const pharmacyResults = outcome.recommendations
+            .map((recommendation) => medicines.find((medicine) => medicine.id === recommendation.medicineId))
+            .filter(Boolean)
+            .map((medicine) => ({
+              ...medicine,
+              strength: deriveStrength(medicine.ingredient),
+              arabicName: deriveArabicName(medicine),
+              offers: medicine.offers.map((offer) => ({
+                ...offer,
+                distanceKm: resolveDistance(location, offer),
+                branchInfo: describeBranch(offer.pharmacy, offer.branch)
+              }))
+            }));
+
+          return sendJson(response, 200, {
+            status: 'ok',
+            interpretedSymptoms: outcome.interpretedSymptoms,
+            recommendations: outcome.recommendations,
+            pharmacyResults,
+            disclaimer: outcome.disclaimer
+          });
+        })
+        .catch((error) => sendJson(response, 400, { error: error.message }));
+    }
+
     return sendJson(response, 404, { error: 'Route not found.' });
   });
 }
@@ -561,4 +524,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createServer };
+module.exports = { createServer, medicines };

@@ -9,8 +9,8 @@ const mockMedicines = [
     packageSize: 21,
     searchTerms: ['amox', 'amoxycillin', 'amoxicilin', 'اموكسيسيلين', 'أموكسيسيلين'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 75, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 82, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 75, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 82, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -21,8 +21,7 @@ const mockMedicines = [
     packageSize: 14,
     searchTerms: ['augmentin', 'augmentine', 'اوجمنتين', 'أوجمنتين'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 210, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: '19011 Pharmacy', branch: 'Agouza', price: 215, currency: 'EGP', available: false, distanceKm: 2.4, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 210, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
     ]
   },
   {
@@ -33,7 +32,7 @@ const mockMedicines = [
     packageSize: 30,
     searchTerms: ['brufen', 'ibuprofen', 'بروفين', 'ايبوبروفين', 'إيبوبروفين'],
     offers: [
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 65, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 65, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -44,8 +43,8 @@ const mockMedicines = [
     packageSize: 20,
     searchTerms: ['cataflam', 'diclofenac', 'كاتافلام', 'ديكلوفيناك'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 58, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 61, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 58, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 61, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -56,7 +55,7 @@ const mockMedicines = [
     packageSize: 50,
     searchTerms: ['voltaren', 'voltarene', 'فولتارين', 'جل فولتارين'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 145, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 145, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently }
     ]
   },
   {
@@ -67,7 +66,7 @@ const mockMedicines = [
     packageSize: 20,
     searchTerms: ['flagyl', 'metronidazole', 'فلاجيل', 'ميترونيدازول'],
     offers: [
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 42, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 42, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -78,8 +77,8 @@ const mockMedicines = [
     packageSize: 14,
     searchTerms: ['nexium', 'esomeprazole', 'نيكسيوم', 'إيزوميبرازول'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 190, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 198, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 190, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 198, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -90,8 +89,7 @@ const mockMedicines = [
     packageSize: 24,
     searchTerms: ['panadol advance', 'بانادول ادفانس', 'بانادول أدفانس', 'paracetamol'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 72, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: '19011 Pharmacy', branch: 'Agouza', price: 76, currency: 'EGP', available: true, distanceKm: 2.4, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 72, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
     ]
   },
   {
@@ -102,7 +100,7 @@ const mockMedicines = [
     packageSize: 10,
     searchTerms: ['claritin', 'loratadine', 'كلاريتين', 'لوراتادين'],
     offers: [
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 88, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 88, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   },
   {
@@ -113,7 +111,7 @@ const mockMedicines = [
     packageSize: 20,
     searchTerms: ['telfast', 'fexofenadine', 'تلفاست', 'فيكسوفينادين'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 120, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 120, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently }
     ]
   },
   {
@@ -124,7 +122,6 @@ const mockMedicines = [
     packageSize: 14,
     searchTerms: ['omeprazole', 'omeprazol', 'اوميبرازول', 'أوميبرازول'],
     offers: [
-      { pharmacy: '19011 Pharmacy', branch: 'Agouza', price: 38, currency: 'EGP', available: true, distanceKm: 2.4, lastChecked: checkedRecently }
     ]
   },
   {
@@ -135,8 +132,8 @@ const mockMedicines = [
     packageSize: 15,
     searchTerms: ['otrin', 'otrivin', 'xylometazoline', 'اوترفين', 'زيلوميتازولين'],
     offers: [
-      { pharmacy: 'El Ezaby', branch: 'Dokki', price: 55, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
-      { pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 59, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
+      { pharmacy: 'El Ezaby', branch: 'Smouha', price: 55, currency: 'EGP', available: true, distanceKm: 1.8, lastChecked: checkedRecently },
+      { pharmacy: 'Seif Pharmacy', branch: 'Sidi Gaber', price: 59, currency: 'EGP', available: true, distanceKm: 3.2, lastChecked: checkedRecently }
     ]
   }
 ];

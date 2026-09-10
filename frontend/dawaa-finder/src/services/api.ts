@@ -21,6 +21,7 @@ export interface PharmacyOffer {
   id: string;
   pharmacyName: string;
   branchName: string;
+  address: string | null;
   city: string | null;
   price: number;
   currency: string;
@@ -81,6 +82,7 @@ export interface ResearchResponse {
 // ---------------------------------------------------------------- wire shapes
 
 interface RawBranchInfo {
+  address?: string | null;
   city?: string;
   governorate?: string;
   latitude?: number;
@@ -146,6 +148,7 @@ function toOffer(medicineId: string, raw: RawOffer): PharmacyOffer {
     id: `${medicineId}-${slug}`,
     pharmacyName: raw.pharmacy,
     branchName: raw.branch,
+    address: raw.branchInfo?.address ?? null,
     city: raw.branchInfo?.city ?? null,
     price: raw.price,
     currency: raw.currency ?? 'EGP',
@@ -279,6 +282,6 @@ export function requestBrowserLocation(): Promise<UserLocation> {
 }
 
 /** Fallback so the demo still works when location is denied. Labelled in the UI. */
-export const CAIRO_CENTRE: UserLocation = { latitude: 30.0444, longitude: 31.2357 };
+export const ALEXANDRIA_CENTRE: UserLocation = { latitude: 31.2001, longitude: 29.9187 };
 
 export { API_BASE_URL };

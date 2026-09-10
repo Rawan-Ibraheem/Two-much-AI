@@ -1,7 +1,5 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-// Keep the suite offline and deterministic: no live Claude calls from tests.
-process.env.AI_ASSIST = 'off';
 const { createServer } = require('./server');
 
 test('health endpoint reports a running API', async (t) => {
@@ -15,6 +13,22 @@ test('health endpoint reports a running API', async (t) => {
     status: 'ok',
     service: 'medicine-search-api'
   });
+});
+
+test('pharmacy sources endpoint returns all configured sources', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/pharmacy-sources`);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.sources.map((source) => source.id), [
+    'tay', 'el-ezaby', 'el-kattan', 'el-kahlily', 'khalil',
+    'sabry', 'haggag', 'seif', 'anwar'
+  ]);
+  assert.equal(body.sources.find((source) => source.id === 'el-ezaby').status, 'demo_source');
 });
 
 test('medicine search filters by name or ingredient', async (t) => {
@@ -92,8 +106,8 @@ test('medicine search supports cheapest sorting and available-only filtering', a
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(body.results[0].id, 'omeprazole-20-14');
-  assert.equal(body.results.length, 15);
+  assert.equal(body.results[0].id, 'flagyl-500-20');
+  assert.equal(body.results.length, 14);
   assert.ok(body.results.every((medicine) => medicine.offers.every((offer) => offer.available)));
 });
 
@@ -102,12 +116,12 @@ test('nearest sorting uses the optional user location', async (t) => {
   t.after(() => server.close());
   const { port } = server.address();
 
-  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?sort=nearest&lat=30.038&lon=31.212`);
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?sort=nearest&lat=31.215&lon=29.955`);
   const body = await response.json();
   const firstOffer = body.results[0].offers[0];
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.location, { latitude: 30.038, longitude: 31.212 });
+  assert.deepEqual(body.location, { latitude: 31.215, longitude: 29.955 });
   assert.equal(body.results[0].name, 'Panadol Extra');
   assert.ok(firstOffer.distanceKm < 1);
 });
@@ -135,7 +149,7 @@ test('pharmacy research returns nearby source and freshness metadata', async (t)
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query: 'paracetamol',
-      location: { latitude: 30.038, longitude: 31.212 },
+      location: { latitude: 31.215, longitude: 29.955 },
       radiusKm: 2
     })
   });
@@ -180,7 +194,7 @@ test('coverage identifies a pharmacy branch with every requested medicine', asyn
 
   assert.equal(response.status, 200);
   assert.equal(completeCandidate.pharmacy, 'El Ezaby');
-  assert.equal(completeCandidate.branch, 'Dokki');
+  assert.equal(completeCandidate.branch, 'Smouha');
   assert.equal(completeCandidate.totalPrice, 133);
 });
 
@@ -307,7 +321,7 @@ test('cheapest and nearest sorting produce genuinely different orders', async (t
   const server = createServer().listen(0);
   t.after(() => server.close());
   const { port } = server.address();
-  const location = 'lat=30.0488&lon=31.2016'; // on top of the Mohandessin branch
+  const location = 'lat=31.244&lon=29.966'; // on top of the Sidi Gaber branch
 
   const cheapest = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=paracetamol&sort=cheapest&${location}`)).json();
   const nearest = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=paracetamol&sort=nearest&${location}`)).json();
@@ -321,13 +335,61 @@ test('cheapest and nearest sorting produce genuinely different orders', async (t
   assert.ok(nearestDistances[0] < 0.5, `expected a near-zero distance, got ${nearestDistances[0]}`);
 });
 
-test('AI assist reports itself disabled rather than failing the search', async (t) => {
+test('an unmatched query degrades to a clean empty result with no AI fields', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());
   const { port } = server.address();
 
-  const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=zzzqqqxxx`)).json();
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=zzzqqqxxx`);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
   assert.equal(body.count, 0);
   assert.equal(body.dataStatus, 'catalog_only_no_match');
-  assert.equal(body.aiAssist.status, 'disabled');
+  // Matching is deterministic only: no AI envelope, and no AI-assisted status.
+  assert.equal(body.aiAssist, undefined);
+  assert.notEqual(body.dataStatus, 'ai_assisted_match');
+});
+
+test('search runs deterministically without any Anthropic configuration', async (t) => {
+  // The key must be irrelevant: set a bogus one and searches must be unaffected.
+  const previous = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'sk-ant-should-never-be-read';
+  t.after(() => {
+    if (previous === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = previous;
+  });
+
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=panadol`)).json();
+  assert.equal(body.count, 2);
+  assert.equal(body.dataStatus, 'catalog_match');
+  assert.equal(body.aiAssist, undefined);
+});
+
+test('deterministic matching still covers Arabic, Franco, typos and strengths', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const expectations = [
+    ['بانادول اكسترا', 'panadol-extra-500'],   // Arabic
+    ['بانادول إكسترا', 'panadol-extra-500'],   // Arabic, different alef hamza
+    ['banadol', 'panadol-extra-500'],          // Franco Arabic
+    ['congstal', 'congestal-20'],              // dropped letter
+    ['klaritin', 'claritin-10-10'],            // phonetic spelling
+    ['nexiam 40', 'nexium-40-14'],             // brand typo + strength
+    ['nexium 40', 'nexium-40-14'],             // brand + bare strength
+    ['amoxicilin', 'amoxicillin-500-21'],      // misspelling
+    ['paracetamol', 'panadol-extra-500']       // active ingredient
+  ];
+
+  for (const [query, expectedId] of expectations) {
+    const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=${encodeURIComponent(query)}`)).json();
+    const ids = body.results.map((medicine) => medicine.id);
+    assert.ok(ids.includes(expectedId), `"${query}" should match ${expectedId}, got [${ids}]`);
+  }
 });

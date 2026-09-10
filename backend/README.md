@@ -27,65 +27,76 @@ npm --prefix backend run check      # syntax check every module
 Copy `.env.example` to `.env`. `server.js` also reads `../shared/.env`, so a key
 already sitting there is picked up automatically. Both files are git-ignored.
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `PORT` | no (3000) | Listen port. |
-| `ANTHROPIC_API_KEY` | no | Enables Claude query normalization. **Backend only** — never expose it to the browser. |
-| `ANTHROPIC_MODEL` | no (`claude-opus-5`) | Model override. |
-| `AI_ASSIST` | no | `off` disables the Claude fallback (used by the tests; also a demo kill switch). |
+| Variable            | Required             | Purpose                                                                                |
+| ------------------- | -------------------- | -------------------------------------------------------------------------------------- |
+| `PORT`              | no (3000)            | Listen port.                                                                           |
+| `ANTHROPIC_API_KEY` | no                   | Enables Claude query normalization. **Backend only** — never expose it to the browser. |
+| `ANTHROPIC_MODEL`   | no (`claude-opus-5`) | Model override.                                                                        |
+| `AI_ASSIST`         | no                   | `off` disables the Claude fallback (used by the tests; also a demo kill switch).       |
 
 ## Endpoints
 
-| Method | Route | Purpose |
-|---|---|---|
-| GET | `/api/health` | Liveness probe. |
-| GET | `/api/medicines` | Main search. `q`, `sort`, `availableOnly`, `lat`, `lon`. |
-| GET | `/api/pharmacy-sources` | Source registry: robots/authorization status per pharmacy site. |
-| POST | `/api/research/availability` | Research mode — re-check branches within `radiusKm` of a location. |
-| POST | `/api/search/coverage` | Find one branch that stocks a whole list of medicine IDs. |
-| POST | `/api/ocr/analyze` | Extract medicine candidates from receipt text or a JPG/PNG/WEBP image (local Tesseract). |
+| Method | Route                        | Purpose                                                                                  |
+| ------ | ---------------------------- | ---------------------------------------------------------------------------------------- |
+| GET    | `/api/health`                | Liveness probe.                                                                          |
+| GET    | `/api/medicines`             | Main search. `q`, `sort`, `availableOnly`, `lat`, `lon`.                                 |
+| GET    | `/api/pharmacy-sources`      | Source registry: robots/authorization status per pharmacy site.                          |
+| POST   | `/api/research/availability` | Research mode — re-check branches within `radiusKm` of a location.                       |
+| POST   | `/api/search/coverage`       | Find one branch that stocks a whole list of medicine IDs.                                |
+| POST   | `/api/ocr/analyze`           | Extract medicine candidates from receipt text or a JPG/PNG/WEBP image (local Tesseract). |
 
 ### `GET /api/medicines`
 
-| Param | Default | Notes |
-|---|---|---|
-| `q` | `''` | Free text. Empty returns the whole catalog. |
-| `sort` | `best-match` | `best-match` \| `cheapest` \| `nearest` \| `freshest` |
-| `availableOnly` | `false` | `true` drops out-of-stock offers and medicines with none in stock. |
-| `lat` / `lon` | — | Both or neither. Present ⇒ `distanceKm` is recomputed per branch with the haversine formula. Invalid coordinates ⇒ `400`. |
+| Param           | Default      | Notes                                                                                                                     |
+| --------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `q`             | `''`         | Free text. Empty returns the whole catalog.                                                                               |
+| `sort`          | `best-match` | `best-match` \| `cheapest` \| `nearest` \| `freshest`                                                                     |
+| `availableOnly` | `false`      | `true` drops out-of-stock offers and medicines with none in stock.                                                        |
+| `lat` / `lon`   | —            | Both or neither. Present ⇒ `distanceKm` is recomputed per branch with the haversine formula. Invalid coordinates ⇒ `400`. |
 
 Response envelope:
 
 ```jsonc
 {
   "count": 2,
-  "dataStatus": "catalog_match",   // | "ai_assisted_match" | "catalog_only_no_match"
+  "dataStatus": "catalog_match", // | "ai_assisted_match" | "catalog_only_no_match"
   "dataSource": "demo_catalog",
   "freshnessNote": "Demo catalog offers. Prices and availability are not live-verified.",
   "aiAssist": { "status": "not_needed" },
-  "results": [{
-    "id": "panadol-extra-500",
-    "name": "Panadol Extra",
-    "arabicName": "بانادول اكسترا",   // derived from searchTerms
-    "ingredient": "Paracetamol 500mg + Caffeine 65mg",
-    "strength": "500mg + 65mg",        // derived from ingredient
-    "form": "Tablets",
-    "packageSize": 24,
-    "offers": [{
-      "pharmacy": "El Ezaby", "branch": "Dokki",
-      "price": 85, "currency": "EGP", "available": true,
-      "distanceKm": 1.8, "lastChecked": "2026-09-10T…Z",
-      "branchInfo": {
-        "city": "Giza", "governorate": "Giza",
-        "latitude": 30.0381, "longitude": 31.2118,
-        "phone": "19600",
-        "mapsUrl": "https://www.google.com/maps/search/?api=1&query=…",
-        "pharmacyUrl": "https://elezabypharmacy.com",
-        "sourceId": "el-ezaby", "sourceStatus": "manual-only",
-        "verificationStatus": "unverified"
-      }
-    }]
-  }]
+  "results": [
+    {
+      "id": "panadol-extra-500",
+      "name": "Panadol Extra",
+      "arabicName": "بانادول اكسترا", // derived from searchTerms
+      "ingredient": "Paracetamol 500mg + Caffeine 65mg",
+      "strength": "500mg + 65mg", // derived from ingredient
+      "form": "Tablets",
+      "packageSize": 24,
+      "offers": [
+        {
+          "pharmacy": "El Ezaby",
+          "branch": "Smouha",
+          "price": 85,
+          "currency": "EGP",
+          "available": true,
+          "distanceKm": 1.8,
+          "lastChecked": "2026-09-10T…Z",
+          "branchInfo": {
+            "city": "Alexandria",
+            "governorate": "Alexandria",
+            "latitude": 31.215,
+            "longitude": 29.955,
+            "phone": "19600",
+            "mapsUrl": "https://www.google.com/maps/search/?api=1&query=…",
+            "pharmacyUrl": "https://elezabypharmacy.com",
+            "sourceId": "el-ezaby",
+            "sourceStatus": "demo_source",
+            "verificationStatus": "unverified",
+          },
+        },
+      ],
+    },
+  ],
 }
 ```
 
@@ -108,7 +119,7 @@ any AI involvement.
 ### Claude fallback
 
 Only when the deterministic pass returns **zero** results and
-`ANTHROPIC_API_KEY` is set: `ai-normalizer.js` asks Claude which *catalog* names
+`ANTHROPIC_API_KEY` is set: `ai-normalizer.js` asks Claude which _catalog_ names
 the query most likely meant, then the same deterministic matcher re-runs against
 those names.
 
@@ -124,16 +135,16 @@ Observed: `nexiam 40` → `Nexium 40mg`; `دواء الصداع بانادول �
 ## Data
 
 `mock-medicines.js` plus three base records in `server.js`: **15 medicines**
-across three branches (El Ezaby Dokki, Seif Mohandessin, 19011 Agouza).
+across two active Alexandria branches (El Ezaby Smouha and Seif Sidi Gaber).
 
 Branch coordinates and hotlines in `pharmacy-directory.js` are real, so distance
 ranking and the call/map buttons behave like production. **Prices and
 availability are synthetic** and every response says so.
 
-`pharmacy-sources.js` records each pharmacy site's robots.txt and authorization
-status. Live connectors stay disabled until a pharmacy provides an approved API,
-feed, or written permission — three of the seven sites listed explicitly
-disallow scraping.
+`pharmacy-sources.js` records the nine configured pharmacy sources, their public
+catalog observations, and conservative path policies. Every source carries
+`authorization: "not_granted"` — no pharmacy has granted data-collection
+permission, so no connector may fetch from any of them.
 
 ## The NestJS track
 

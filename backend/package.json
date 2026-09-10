@@ -11,9 +11,6 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "check": "node -e \"['server.js','mock-medicines.js','pharmacy-sources.js','pharmacy-directory.js','ai-normalizer.js'].forEach(f=>require('node:child_process').execFileSync(process.execPath,['--check',f],{stdio:'inherit'}))\""
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.124.0"
+    "check": "node -e \"['server.js','mock-medicines.js','pharmacy-sources.js','pharmacy-directory.js','ai/medicine-matcher.js','ai/medical/recommender.js','ai/medical/medical-data.js','ai/medical/safety-rules.js'].forEach(f=>require('node:child_process').execFileSync(process.execPath,['--check',f],{stdio:'inherit'}))\""
   }
 }

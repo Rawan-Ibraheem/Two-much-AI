@@ -81,7 +81,7 @@ try {
   if (panadol.errors.length) console.log('   errors:', panadol.errors.slice(0, 3));
   check('renders the product name from the API', panadol.text.includes('Panadol Extra'));
   check('renders a pharmacy from the API', panadol.text.includes('El Ezaby'));
-  check('renders a branch from the API', panadol.text.includes('Dokki'));
+  check('renders a branch from the API', panadol.text.includes('Smouha'));
   // textContent concatenates adjacent nodes ("In Stock85 EGP"), so match the
   // number immediately preceding the currency rather than a standalone token.
   check('renders a price in EGP', /85\s*EGP/.test(panadol.text));
