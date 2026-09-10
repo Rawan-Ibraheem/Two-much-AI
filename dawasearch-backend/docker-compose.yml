@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: dawasearch-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dawasearch
+      POSTGRES_PASSWORD: dawasearch
+      POSTGRES_DB: dawasearch_dev
+    ports:
+      # Host 5433 -> container 5432: a local system Postgres already owns host 5432.
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dawasearch -d dawasearch_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
