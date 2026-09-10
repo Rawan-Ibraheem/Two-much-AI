@@ -1,5 +1,6 @@
 const http = require('node:http');
 const { URL } = require('node:url');
+const { pharmacySources: sourceRegistry } = require('./pharmacy-sources');
 
 const checkedRecently = new Date().toISOString();
 const branchCoordinates = {
@@ -8,9 +9,9 @@ const branchCoordinates = {
   '19011 Pharmacy: Agouza': { latitude: 30.0309, longitude: 31.2152 }
 };
 const pharmacySources = {
-  'El Ezaby: Dokki': { connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/dokki', verificationStatus: 'unverified' },
-  'Seif Pharmacy: Mohandessin': { connector: 'mock-public-catalog', sourceUrl: 'mock://seif/mohandessin', verificationStatus: 'unverified' },
-  '19011 Pharmacy: Agouza': { connector: 'mock-public-catalog', sourceUrl: 'mock://19011/agouza', verificationStatus: 'unverified' }
+  'El Ezaby: Dokki': { sourceId: 'el-ezaby', connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/dokki', verificationStatus: 'unverified' },
+  'Seif Pharmacy: Mohandessin': { sourceId: 'seif', connector: 'mock-public-catalog', sourceUrl: 'mock://seif/mohandessin', verificationStatus: 'unverified' },
+  '19011 Pharmacy: Agouza': { sourceId: '19011', connector: 'mock-public-catalog', sourceUrl: 'mock://19011/agouza', verificationStatus: 'unverified' }
 };
 
 const medicines = [
@@ -241,6 +242,10 @@ function createServer() {
 
     if (requestUrl.pathname === '/api/health') {
       return sendJson(response, 200, { status: 'ok', service: 'medicine-search-api' });
+    }
+
+    if (request.method === 'GET' && requestUrl.pathname === '/api/pharmacy-sources') {
+      return sendJson(response, 200, { sources: sourceRegistry });
     }
 
     if (requestUrl.pathname === '/api/medicines') {
