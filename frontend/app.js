@@ -6,6 +6,9 @@ const coverageButton = document.querySelector('#coverage-button');
 const coverageElement = document.querySelector('#coverage');
 const locationButton = document.querySelector('#location-button');
 const locationStatus = document.querySelector('#location-status');
+const demoLocationButton = document.querySelector('#demo-location-button');
+const latitudeInput = document.querySelector('#latitude');
+const longitudeInput = document.querySelector('#longitude');
 const researchStatus = document.querySelector('#research-status');
 const researchResults = document.querySelector('#research-results');
 let userLocation = null;
@@ -67,6 +70,7 @@ async function search(event) {
     const body = await response.json();
     renderResults(body.results);
     setStatus(`${body.count} result${body.count === 1 ? '' : 's'} found.`);
+    if (userLocation) await researchNearby();
   } catch (error) {
     renderResults([]);
     setStatus(error.message, 'error');
@@ -75,13 +79,15 @@ async function search(event) {
 
 function useLocation() {
   if (!navigator.geolocation) {
-    locationStatus.textContent = 'Location is not supported by this browser';
+    locationStatus.textContent = 'GPS unavailable; enter a location below';
     return;
   }
   locationStatus.textContent = 'Requesting location...';
   navigator.geolocation.getCurrentPosition(
     ({ coords }) => {
       userLocation = { latitude: coords.latitude, longitude: coords.longitude };
+      latitudeInput.value = userLocation.latitude.toFixed(6);
+      longitudeInput.value = userLocation.longitude.toFixed(6);
       locationStatus.textContent = 'Location enabled for nearest results';
       setStatus('Location enabled. Checking nearby pharmacy sources...');
       if (document.querySelector('#query').value.trim()) {
@@ -89,11 +95,30 @@ function useLocation() {
       }
     },
     () => {
-      locationStatus.textContent = 'Location permission was not granted';
-      setStatus('Location was not enabled. Search still works without it.', 'error');
+      locationStatus.textContent = 'GPS unavailable; enter a location below';
+      setStatus('GPS was not available. You can use a demo or manual location.');
     },
     { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
   );
+}
+
+function useManualLocation(latitude, longitude, label) {
+  const parsedLatitude = Number(latitude);
+  const parsedLongitude = Number(longitude);
+  if (!Number.isFinite(parsedLatitude) || !Number.isFinite(parsedLongitude)
+    || parsedLatitude < -90 || parsedLatitude > 90
+    || parsedLongitude < -180 || parsedLongitude > 180) {
+    setStatus('Enter a valid latitude and longitude.', 'error');
+    return;
+  }
+  userLocation = { latitude: parsedLatitude, longitude: parsedLongitude };
+  latitudeInput.value = parsedLatitude;
+  longitudeInput.value = parsedLongitude;
+  locationStatus.textContent = `${label} enabled for nearby research`;
+  setStatus('Location enabled. Search to calculate nearby availability.');
+  if (document.querySelector('#query').value.trim()) {
+    search(new Event('submit')).then(researchNearby);
+  }
 }
 
 function renderResearch(body) {
@@ -161,3 +186,14 @@ async function findCoverage() {
 searchForm.addEventListener('submit', search);
 coverageButton.addEventListener('click', findCoverage);
 locationButton.addEventListener('click', useLocation);
+demoLocationButton.addEventListener('click', () => useManualLocation(30.038, 31.212, 'Demo location'));
+latitudeInput.addEventListener('change', () => {
+  if (latitudeInput.value && longitudeInput.value) {
+    useManualLocation(latitudeInput.value, longitudeInput.value, 'Manual location');
+  }
+});
+longitudeInput.addEventListener('change', () => {
+  if (latitudeInput.value && longitudeInput.value) {
+    useManualLocation(latitudeInput.value, longitudeInput.value, 'Manual location');
+  }
+});

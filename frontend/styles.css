@@ -109,6 +109,33 @@ select {
   background: #286044;
 }
 
+.manual-location {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  color: #59645e;
+  font: 0.78rem ui-sans-serif, system-ui, sans-serif;
+}
+
+.manual-location label {
+  margin: 0;
+  color: #59645e;
+  font: inherit;
+}
+
+.manual-location input {
+  flex: 0 1 7rem;
+  min-height: 2.3rem;
+  padding: 0 0.5rem;
+  font-size: 0.85rem;
+}
+
+.manual-location .secondary-button {
+  min-height: 2.3rem;
+  white-space: nowrap;
+}
+
 input,
 button {
   min-height: 3.2rem;
@@ -295,5 +322,10 @@ button:focus-visible {
   .location-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .manual-location {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 }
