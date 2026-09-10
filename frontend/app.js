@@ -11,6 +11,12 @@ const latitudeInput = document.querySelector('#latitude');
 const longitudeInput = document.querySelector('#longitude');
 const researchStatus = document.querySelector('#research-status');
 const researchResults = document.querySelector('#research-results');
+const receiptFileInput = document.querySelector('#receipt-file');
+const ocrTextInput = document.querySelector('#ocr-text');
+const analyzeButton = document.querySelector('#analyze-button');
+const ocrStatus = document.querySelector('#ocr-status');
+const ocrReview = document.querySelector('#ocr-review');
+const confirmOcrButton = document.querySelector('#confirm-ocr-button');
 let userLocation = null;
 
 function setStatus(message, state = '') {
@@ -20,6 +26,10 @@ function setStatus(message, state = '') {
 
 function selectedMedicineIds() {
   return [...document.querySelectorAll('input[name="medicine"]:checked')].map((input) => input.value);
+}
+
+function selectedOcrMedicineIds() {
+  return [...document.querySelectorAll('input[name="ocr-medicine"]:checked')].map((input) => input.value);
 }
 
 function renderResults(results) {
@@ -159,11 +169,15 @@ async function researchNearby() {
 
 async function findCoverage() {
   const items = selectedMedicineIds();
+  await findCoverageForItems(items, 'Checking branch coverage...');
+}
+
+async function findCoverageForItems(items, loadingMessage) {
   if (items.length === 0) {
     setStatus('Select at least one medicine first.', 'error');
     return;
   }
-  setStatus('Checking branch coverage...');
+  setStatus(loadingMessage);
   try {
     const response = await fetch(`${apiUrl}/api/search/coverage`, {
       method: 'POST',
@@ -184,8 +198,73 @@ async function findCoverage() {
   }
 }
 
+function renderOcrReview(body) {
+  ocrReview.replaceChildren();
+  if (!body.requests.length) {
+    ocrReview.innerHTML = '<p class="empty">No catalog medicines were extracted. Review the unmatched lines manually.</p>';
+    confirmOcrButton.disabled = true;
+    return;
+  }
+  ocrReview.innerHTML = `<p class="review-note">Review the extracted list before searching. Matching confidence is not prescription validation.</p>
+    ${body.requests.map((request) => `<label class="ocr-item">
+      <input type="checkbox" name="ocr-medicine" value="${request.medicineId}" checked>
+      <span><strong>${request.name}</strong><small>${request.rawText} · ${(request.confidence * 100).toFixed(0)}% match · review required</small></span>
+    </label>`).join('')}
+    ${body.unmatchedLines.length ? `<p class="unmatched"><strong>Unmatched lines:</strong> ${body.unmatchedLines.join(' | ')}</p>` : ''}`;
+  confirmOcrButton.disabled = false;
+}
+
+async function analyzeReceipt() {
+  const file = receiptFileInput.files[0];
+  let text = ocrTextInput.value.trim();
+  let imageBase64 = null;
+  let mimeType = 'text/plain';
+  let filename = 'pasted-receipt.txt';
+  if (file) {
+    filename = file.name;
+    mimeType = file.type || 'application/octet-stream';
+    if (mimeType === 'text/plain' || mimeType === 'application/json' || file.name.endsWith('.txt') || file.name.endsWith('.json')) {
+      text = await file.text();
+    } else {
+      imageBase64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('Could not read receipt image.'));
+        reader.readAsDataURL(file);
+      });
+      text = 'Image receipt submitted for local OCR.';
+    }
+  }
+  if (!text) {
+    ocrStatus.textContent = 'Choose a text receipt or paste receipt text first.';
+    return;
+  }
+  ocrStatus.textContent = 'Analyzing receipt...';
+  try {
+    const response = await fetch(`${apiUrl}/api/ocr/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filename, mimeType, text, imageBase64 })
+    });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.error || 'Receipt analysis failed.');
+    ocrStatus.textContent = `${body.analysisStatus}. Confirm the extracted medicines below.`;
+    renderOcrReview(body);
+  } catch (error) {
+    ocrReview.replaceChildren();
+    confirmOcrButton.disabled = true;
+    ocrStatus.textContent = error.message;
+  }
+}
+
+async function confirmOcrMedicines() {
+  await findCoverageForItems(selectedOcrMedicineIds(), 'Searching for one branch with the confirmed medicines...');
+}
+
 searchForm.addEventListener('submit', search);
 coverageButton.addEventListener('click', findCoverage);
+analyzeButton.addEventListener('click', analyzeReceipt);
+confirmOcrButton.addEventListener('click', confirmOcrMedicines);
 locationButton.addEventListener('click', useLocation);
 demoLocationButton.addEventListener('click', () => useManualLocation(30.038, 31.212, 'Demo location'));
 latitudeInput.addEventListener('change', () => {

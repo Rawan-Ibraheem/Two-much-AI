@@ -174,6 +174,44 @@ test('coverage rejects unknown medicine IDs', async (t) => {
   });
 });
 
+test('OCR analysis extracts bilingual medicines and keeps unmatched lines for review', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/ocr/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      filename: 'receipt.txt',
+      mimeType: 'text/plain',
+      text: 'Panadol Extra 24 tablets\nبانادول اكسترا\nUnknown medicine'
+    })
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.analysisStatus, 'ready_for_confirmation');
+  assert.deepEqual(body.requests.map((request) => request.medicineId), ['panadol-extra-500']);
+  assert.equal(body.requests[0].needsReview, true);
+  assert.deepEqual(body.unmatchedLines, ['Unknown medicine']);
+});
+
+test('OCR analysis requires image data for image receipts', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/ocr/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: 'receipt.jpg', mimeType: 'image/jpeg', text: 'Panadol Extra' })
+  });
+
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /Image data is required/);
+});
+
 test('unknown routes return a JSON 404', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());

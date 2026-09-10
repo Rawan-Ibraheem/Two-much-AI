@@ -1,6 +1,12 @@
 const http = require('node:http');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 const { URL } = require('node:url');
 const { pharmacySources: sourceRegistry } = require('./pharmacy-sources');
+const execFileAsync = promisify(execFile);
 
 const checkedRecently = new Date().toISOString();
 const branchCoordinates = {
@@ -77,12 +83,12 @@ function sendJson(response, statusCode, body) {
   response.end(JSON.stringify(body));
 }
 
-function readJsonBody(request) {
+function readJsonBody(request, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     let body = '';
     request.on('data', (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      if (body.length > maxBytes) {
         reject(new Error('Request body is too large.'));
         request.destroy();
       }
@@ -96,6 +102,22 @@ function readJsonBody(request) {
     });
     request.on('error', reject);
   });
+}
+
+async function runLocalOcr(imageBase64, mimeType) {
+  const extension = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'medicine-ocr-'));
+  const imagePath = path.join(temporaryDirectory, `receipt${extension}`);
+  try {
+    await fs.writeFile(imagePath, Buffer.from(imageBase64, 'base64'));
+    const { stdout } = await execFileAsync('tesseract', [imagePath, 'stdout', '-l', 'ara+eng', '--psm', '6'], {
+      timeout: 30_000,
+      maxBuffer: 500_000
+    });
+    return stdout;
+  } finally {
+    await fs.rm(temporaryDirectory, { recursive: true, force: true });
+  }
 }
 
 function getLocation(requestUrl) {
@@ -163,6 +185,32 @@ function matchesSearch(medicine, normalizedQuery) {
     const allowedDistance = queryToken.length >= 8 ? 2 : 1;
     return editDistance(queryToken, termToken) <= allowedDistance;
   })));
+}
+
+function extractMedicineRequests(text) {
+  const lines = text.split(/\r?\n|[,;|]/).map((line) => line.trim()).filter(Boolean);
+  const requests = [];
+  const unmatchedLines = [];
+  for (const rawText of lines) {
+    const normalizedLine = normalizeSearchText(rawText);
+    const medicine = medicines.find((candidate) => {
+      const terms = [candidate.name, ...(candidate.searchTerms || [])].map(normalizeSearchText);
+      return terms.some((term) => normalizedLine.includes(term));
+    });
+    if (medicine) {
+      requests.push({
+        medicineId: medicine.id,
+        name: medicine.name,
+        rawText,
+        confidence: 0.98,
+        needsReview: true
+      });
+    } else {
+      unmatchedLines.push(rawText);
+    }
+  }
+  const uniqueRequests = [...new Map(requests.map((request) => [request.medicineId, request])).values()];
+  return { requests: uniqueRequests, unmatchedLines };
 }
 
 function searchMedicines(requestUrl) {
@@ -285,7 +333,7 @@ function createServer() {
     }
 
     if (request.method !== 'GET') {
-      if (request.method !== 'POST' || !['/api/search/coverage', '/api/research/availability'].includes(requestUrl.pathname)) {
+      if (request.method !== 'POST' || !['/api/search/coverage', '/api/ocr/analyze', '/api/research/availability'].includes(requestUrl.pathname)) {
         return sendJson(response, 405, { error: 'Only GET and supported POST requests are accepted.' });
       }
     }
@@ -328,6 +376,43 @@ function createServer() {
           return sendJson(response, 200, {
             requestedMedicineIds: requestedIds,
             candidates: buildCoverage(requestedIds)
+          });
+        })
+        .catch((error) => sendJson(response, 400, { error: error.message }));
+    }
+
+    if (request.method === 'POST' && requestUrl.pathname === '/api/ocr/analyze') {
+      return readJsonBody(request, 10_000_000)
+        .then(async (body) => {
+          const supportedTypes = ['text/plain', 'application/json'];
+          const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+          if (imageTypes.includes(body.mimeType)) {
+            if (typeof body.imageBase64 !== 'string' || !body.imageBase64.trim()) {
+              return sendJson(response, 400, { error: 'Image data is required for image OCR.' });
+            }
+            if (body.imageBase64.length > 8_000_000) {
+              return sendJson(response, 400, { error: 'Receipt image is too large.' });
+            }
+            body.text = await runLocalOcr(body.imageBase64, body.mimeType);
+          }
+          if (typeof body.text !== 'string' || !body.text.trim()) {
+            return sendJson(response, 400, { error: 'OCR text is required for analysis.' });
+          }
+          if (body.text.length > 100_000) {
+            return sendJson(response, 400, { error: 'OCR text is too large.' });
+          }
+          if (body.mimeType && !supportedTypes.includes(body.mimeType) && !imageTypes.includes(body.mimeType)) {
+            return sendJson(response, 415, {
+              error: 'Unsupported receipt type. Use JPG, PNG, WEBP, TXT, or JSON.'
+            });
+          }
+          const extraction = extractMedicineRequests(body.text);
+          return sendJson(response, 200, {
+            analysisStatus: extraction.requests.length ? 'ready_for_confirmation' : 'partially_parsed',
+            limitation: 'Document analysis is not prescription validation. Confirm every item with a pharmacist when needed.',
+            filename: typeof body.filename === 'string' ? body.filename : null,
+            requests: extraction.requests,
+            unmatchedLines: extraction.unmatchedLines
           });
         })
         .catch((error) => sendJson(response, 400, { error: error.message }));
