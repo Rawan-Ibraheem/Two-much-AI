@@ -35,7 +35,8 @@ function selectedOcrMedicineIds() {
 function renderResults(results) {
   resultsElement.replaceChildren();
   if (results.length === 0) {
-    resultsElement.innerHTML = '<p class="empty">No matching medicines found.</p>';
+    resultsElement.innerHTML = `<p class="empty">No match in the current catalog.</p>
+      <p class="empty-detail">Live pharmacy connectors are not active yet, so this does not confirm that pharmacies lack the medicine.</p>`;
     coverageButton.disabled = true;
     return;
   }
@@ -79,7 +80,7 @@ async function search(event) {
     if (!response.ok) throw new Error('Search request failed.');
     const body = await response.json();
     renderResults(body.results);
-    setStatus(`${body.count} result${body.count === 1 ? '' : 's'} found.`);
+    setStatus(body.count ? `${body.count} result${body.count === 1 ? '' : 's'} found.` : body.nextStep, body.count ? '' : 'error');
     if (userLocation) await researchNearby();
   } catch (error) {
     renderResults([]);

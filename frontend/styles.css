@@ -398,6 +398,13 @@ button:focus-visible {
   font: 1rem ui-sans-serif, system-ui, sans-serif;
 }
 
+.empty-detail {
+  max-width: 42rem;
+  margin: -0.5rem 0 0;
+  color: #8b5e34;
+  font: 0.84rem/1.5 ui-sans-serif, system-ui, sans-serif;
+}
+
 @media (max-width: 38rem) {
   .search-row {
     flex-direction: column;

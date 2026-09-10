@@ -52,6 +52,20 @@ test('medicine search supports Arabic aliases and English misspellings', async (
   ]);
 });
 
+test('empty search explains that live connectors are not active', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=amoxicillin`);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.count, 0);
+  assert.equal(body.dataStatus, 'catalog_only_no_match');
+  assert.match(body.nextStep, /approved source or API/);
+});
+
 test('medicine search supports cheapest sorting and available-only filtering', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());

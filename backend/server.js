@@ -357,6 +357,10 @@ function createServer() {
         availableOnly: search.availableOnly,
         location: search.location,
         count: search.results.length,
+        dataStatus: search.results.length ? 'catalog_match' : 'catalog_only_no_match',
+        nextStep: search.results.length
+          ? 'Review offers and freshness before relying on availability.'
+          : 'Live pharmacy connectors are not active; add an approved source or API to search this medicine.',
         lastChecked: new Date().toISOString(),
         results: search.results
       });
