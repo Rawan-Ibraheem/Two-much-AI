@@ -24,10 +24,11 @@ test('medicine search filters by name or ingredient', async (t) => {
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(body.count, 2);
+  assert.equal(body.count, 3);
   assert.deepEqual(body.results.map((medicine) => medicine.id), [
     'panadol-extra-500',
-    'congestal-20'
+    'congestal-20',
+    'panadol-advance-24'
   ]);
   assert.equal(body.sort, 'best-match');
   assert.equal(body.availableOnly, false);
@@ -48,7 +49,8 @@ test('medicine search supports Arabic aliases and English misspellings', async (
   assert.deepEqual(arabicBody.results.map((medicine) => medicine.id), ['panadol-extra-500']);
   assert.deepEqual(typoBody.results.map((medicine) => medicine.id), [
     'panadol-extra-500',
-    'congestal-20'
+    'congestal-20',
+    'panadol-advance-24'
   ]);
 });
 
@@ -57,13 +59,26 @@ test('empty search explains that live connectors are not active', async (t) => {
   t.after(() => server.close());
   const { port } = server.address();
 
-  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=amoxicillin`);
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=medicine-that-does-not-exist`);
   const body = await response.json();
 
   assert.equal(response.status, 200);
   assert.equal(body.count, 0);
   assert.equal(body.dataStatus, 'catalog_only_no_match');
   assert.match(body.nextStep, /approved source or API/);
+});
+
+test('expanded mock catalog searches medicines beyond the original demo records', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=amoxicillin%20500`);
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.results.map((medicine) => medicine.id), ['amoxicillin-500-21']);
+  assert.equal(body.results[0].offers[0].pharmacy, 'El Ezaby');
 });
 
 test('medicine search supports cheapest sorting and available-only filtering', async (t) => {
@@ -75,11 +90,8 @@ test('medicine search supports cheapest sorting and available-only filtering', a
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.deepEqual(body.results.map((medicine) => medicine.id), [
-    'congestal-20',
-    'panadol-extra-500',
-    'vitamin-d3-30'
-  ]);
+  assert.equal(body.results[0].id, 'omeprazole-20-14');
+  assert.equal(body.results.length, 15);
   assert.ok(body.results.every((medicine) => medicine.offers.every((offer) => offer.available)));
 });
 
@@ -129,7 +141,7 @@ test('pharmacy research returns nearby source and freshness metadata', async (t)
 
   assert.equal(response.status, 200);
   assert.equal(body.mode, 'research');
-  assert.equal(body.results.length, 2);
+  assert.equal(body.results.length, 3);
   assert.ok(body.results.every((result) => result.offers.length > 0));
   assert.equal(body.results[0].offers[0].source.connector, 'mock-public-catalog');
   assert.equal(body.results[0].offers[0].source.verificationStatus, 'unverified');

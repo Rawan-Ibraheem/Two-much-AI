@@ -6,6 +6,7 @@ const { execFile } = require('node:child_process');
 const { promisify } = require('node:util');
 const { URL } = require('node:url');
 const { pharmacySources: sourceRegistry } = require('./pharmacy-sources');
+const { mockMedicines } = require('./mock-medicines');
 const execFileAsync = promisify(execFile);
 
 const checkedRecently = new Date().toISOString();
@@ -20,7 +21,7 @@ const pharmacySources = {
   '19011 Pharmacy: Agouza': { sourceId: '19011', connector: 'mock-public-catalog', sourceUrl: 'mock://19011/agouza', verificationStatus: 'unverified' }
 };
 
-const medicines = [
+const baseMedicines = [
   {
     id: 'panadol-extra-500',
     name: 'Panadol Extra',
@@ -72,6 +73,7 @@ const medicines = [
     ]
   }
 ];
+const medicines = [...baseMedicines, ...mockMedicines];
 
 function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
