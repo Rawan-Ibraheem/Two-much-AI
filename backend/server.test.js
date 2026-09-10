@@ -33,6 +33,25 @@ test('medicine search filters by name or ingredient', async (t) => {
   assert.equal(body.availableOnly, false);
 });
 
+test('medicine search supports Arabic aliases and English misspellings', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const arabicResponse = await fetch(`http://127.0.0.1:${port}/api/medicines?q=بانادول%20إكسترا`);
+  const arabicBody = await arabicResponse.json();
+  const typoResponse = await fetch(`http://127.0.0.1:${port}/api/medicines?q=paracetmol`);
+  const typoBody = await typoResponse.json();
+
+  assert.equal(arabicBody.originalQuery, 'بانادول إكسترا');
+  assert.equal(arabicBody.query, 'بانادول اكسترا');
+  assert.deepEqual(arabicBody.results.map((medicine) => medicine.id), ['panadol-extra-500']);
+  assert.deepEqual(typoBody.results.map((medicine) => medicine.id), [
+    'panadol-extra-500',
+    'congestal-20'
+  ]);
+});
+
 test('medicine search supports cheapest sorting and available-only filtering', async (t) => {
   const server = createServer().listen(0);
   t.after(() => server.close());

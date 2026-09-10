@@ -21,6 +21,7 @@ const medicines = [
     ingredient: 'Paracetamol 500mg + Caffeine 65mg',
     form: 'Tablets',
     packageSize: 24,
+    searchTerms: ['panadol extra', 'بانادول اكسترا', 'بانادول إكسترا', 'paracetamol', 'باراسيتامول'],
     offers: [
       {
         pharmacy: 'El Ezaby', branch: 'Dokki', price: 85, currency: 'EGP', available: true,
@@ -38,6 +39,7 @@ const medicines = [
     ingredient: 'Paracetamol 500mg + Pseudoephedrine 30mg',
     form: 'Tablets',
     packageSize: 20,
+    searchTerms: ['congestal', 'كونجستال', 'paracetamol', 'باراسيتامول'],
     offers: [
       {
         pharmacy: 'El Ezaby', branch: 'Dokki', price: 48, currency: 'EGP', available: true,
@@ -55,6 +57,7 @@ const medicines = [
     ingredient: 'Cholecalciferol 1000 IU',
     form: 'Capsules',
     packageSize: 30,
+    searchTerms: ['vitamin d3', 'فيتامين د', 'فيتامين د3', 'cholecalciferol'],
     offers: [
       {
         pharmacy: 'Seif Pharmacy', branch: 'Mohandessin', price: 120, currency: 'EGP', available: true,
@@ -119,15 +122,59 @@ function distanceInKm(from, to) {
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
+function normalizeSearchText(value) {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[إأآ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function editDistance(left, right) {
+  const row = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    let diagonal = row[0];
+    row[0] = leftIndex;
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const previous = row[rightIndex];
+      row[rightIndex] = left[leftIndex - 1] === right[rightIndex - 1]
+        ? diagonal
+        : Math.min(diagonal, row[rightIndex - 1], previous) + 1;
+      diagonal = previous;
+    }
+  }
+  return row[right.length];
+}
+
+function matchesSearch(medicine, normalizedQuery) {
+  if (!normalizedQuery) return true;
+  const terms = [medicine.name, medicine.ingredient, ...(medicine.searchTerms || [])]
+    .map(normalizeSearchText);
+  if (terms.some((term) => term.includes(normalizedQuery))) return true;
+
+  const queryTokens = normalizedQuery.split(' ');
+  return queryTokens.every((queryToken) => terms.some((term) => term.split(' ').some((termToken) => {
+    if (queryToken.length < 4 || termToken.length < 4) return false;
+    const allowedDistance = queryToken.length >= 8 ? 2 : 1;
+    return editDistance(queryToken, termToken) <= allowedDistance;
+  })));
+}
+
 function searchMedicines(requestUrl) {
-  const query = (requestUrl.searchParams.get('q') || '').trim().toLowerCase();
+  const originalQuery = (requestUrl.searchParams.get('q') || '').trim();
+  const query = normalizeSearchText(originalQuery);
   const availableOnly = requestUrl.searchParams.get('availableOnly') === 'true';
   const sort = requestUrl.searchParams.get('sort') || 'best-match';
   const location = getLocation(requestUrl);
   if (location?.error) return { error: location.error };
   const results = medicines
     .filter((medicine) => {
-      const matchesQuery = !query || `${medicine.name} ${medicine.ingredient}`.toLowerCase().includes(query);
+      const matchesQuery = matchesSearch(medicine, query);
       const hasAvailableOffer = medicine.offers.some((offer) => offer.available);
       return matchesQuery && (!availableOnly || hasAvailableOffer);
     })
@@ -147,7 +194,7 @@ function searchMedicines(requestUrl) {
     results.sort((left, right) => Math.min(...left.offers.map((offer) => offer.distanceKm)) - Math.min(...right.offers.map((offer) => offer.distanceKm)));
   }
 
-  return { query, sort, availableOnly, location, results };
+  return { originalQuery, query, sort, availableOnly, location, results };
 }
 
 function buildCoverage(items) {
@@ -257,6 +304,7 @@ function createServer() {
 
       return sendJson(response, 200, {
         query: search.query,
+        originalQuery: search.originalQuery,
         sort: search.sort,
         availableOnly: search.availableOnly,
         location: search.location,
