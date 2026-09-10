@@ -1,31 +1,16 @@
 {
-  "name": "dawasearch-backend",
+  "name": "medicine-search-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "Medicine price/availability comparison platform for Egypt - backend",
+  "description": "Node.js REST API for the medicine search hackathon demo",
+  "main": "server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "dev": "nest start --watch",
-    "build": "nest build",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "seed": "ts-node src/seed/seed.ts"
-  },
-  "dependencies": {
-    "@nestjs/common": "^10.4.15",
-    "@nestjs/config": "^3.3.0",
-    "@nestjs/core": "^10.4.15",
-    "@nestjs/platform-express": "^10.4.15",
-    "@nestjs/typeorm": "^12.0.1",
-    "pg": "^8.23.0",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1",
-    "typeorm": "^1.1.1"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "^10.4.9",
-    "@nestjs/schematics": "^10.2.3",
-    "@types/node": "^22.10.2",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.7.2"
+    "start": "node server.js",
+    "test": "node --test",
+    "check": "node --check server.js && node --check mock-medicines.js && node --check pharmacy-sources.js"
   }
 }

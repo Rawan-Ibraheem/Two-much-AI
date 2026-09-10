@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vite/
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs and runtime files
+*.log
+logs/
+*.pid
+*.pid.lock
+
+# Test and coverage output
+coverage/
+.nyc_output/
+
+# Tool caches
+.cache/
+.eslintcache
+.parcel-cache/
+. Turborepo/
+.turbo/
+
+# Local editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating system files
+.DS_Store
+Thumbs.db
