@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Medicine Search Demo</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <p class="eyebrow">Backend smoke test</p>
+      <h1>Find a medicine</h1>
+      <p class="intro">Search the mock pharmacy catalog, compare offers, and check whether one branch covers your list.</p>
+
+      <form id="search-form" class="search-form">
+        <label for="query">Medicine or active ingredient</label>
+        <div class="search-row">
+          <input id="query" name="q" type="search" placeholder="Try Panadol or paracetamol" required>
+          <button type="submit">Search</button>
+        </div>
+        <div class="filters">
+          <label for="sort">Sort</label>
+          <select id="sort" name="sort">
+            <option value="best-match">Best match</option>
+            <option value="cheapest">Cheapest</option>
+            <option value="nearest">Nearest</option>
+          </select>
+          <label class="check-label" for="available-only">
+            <input id="available-only" type="checkbox">
+            Available only
+          </label>
+        </div>
+      </form>
+
+      <p id="status" class="status" role="status"></p>
+      <section id="results" class="results" aria-live="polite"></section>
+      <button id="coverage-button" class="coverage-button" type="button" disabled>Find one branch for selected medicines</button>
+      <section id="coverage" class="coverage" aria-live="polite"></section>
+
+      <a class="health-link" href="http://localhost:3000/api/health" target="_blank" rel="noreferrer">Check API health</a>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
