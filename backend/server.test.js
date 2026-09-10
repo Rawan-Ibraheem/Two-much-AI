@@ -1,5 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+// Keep the suite offline and deterministic: no live Claude calls from tests.
+process.env.AI_ASSIST = 'off';
 const { createServer } = require('./server');
 
 test('health endpoint reports a running API', async (t) => {
@@ -246,4 +248,86 @@ test('unknown routes return a JSON 404', async (t) => {
   const response = await fetch(`http://127.0.0.1:${port}/missing`);
   assert.equal(response.status, 404);
   assert.deepEqual(await response.json(), { error: 'Route not found.' });
+});
+
+// --- contract the React frontend depends on ---------------------------------
+
+test('every offer carries the branch metadata the frontend renders', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const response = await fetch(`http://127.0.0.1:${port}/api/medicines?q=panadol`);
+  const body = await response.json();
+  assert.ok(body.results.length > 0);
+
+  for (const medicine of body.results) {
+    // Display fields the UI shows as their own chips.
+    assert.equal(typeof medicine.strength, 'string');
+    assert.match(medicine.arabicName, /[؀-ۿ]/);
+
+    for (const offer of medicine.offers) {
+      assert.ok(offer.branchInfo, `${offer.pharmacy}/${offer.branch} has no branchInfo`);
+      assert.equal(typeof offer.branchInfo.phone, 'string');
+      assert.match(offer.branchInfo.mapsUrl, /^https:\/\/www\.google\.com\/maps/);
+      assert.match(offer.branchInfo.pharmacyUrl, /^https?:\/\//);
+      assert.equal(typeof offer.branchInfo.city, 'string');
+      // Demo data must never claim to be freshly verified.
+      assert.equal(offer.branchInfo.verificationStatus, 'unverified');
+    }
+  }
+});
+
+test('search responses label the data as unverified demo stock', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=panadol`)).json();
+  assert.equal(body.dataSource, 'demo_catalog');
+  assert.match(body.freshnessNote, /not live-verified/i);
+});
+
+test('freshest sorting orders products by their most recent check', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=&sort=freshest`)).json();
+  assert.equal(body.sort, 'freshest');
+
+  const freshness = body.results.map((medicine) =>
+    Math.max(...medicine.offers.map((offer) => Date.parse(offer.lastChecked)))
+  );
+  const sorted = [...freshness].sort((left, right) => right - left);
+  assert.deepEqual(freshness, sorted);
+});
+
+test('cheapest and nearest sorting produce genuinely different orders', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+  const location = 'lat=30.0488&lon=31.2016'; // on top of the Mohandessin branch
+
+  const cheapest = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=paracetamol&sort=cheapest&${location}`)).json();
+  const nearest = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=paracetamol&sort=nearest&${location}`)).json();
+
+  const cheapestPrices = cheapest.results.map((medicine) => Math.min(...medicine.offers.map((offer) => offer.price)));
+  assert.deepEqual(cheapestPrices, [...cheapestPrices].sort((a, b) => a - b));
+
+  const nearestDistances = nearest.results.map((medicine) => Math.min(...medicine.offers.map((offer) => offer.distanceKm)));
+  assert.deepEqual(nearestDistances, [...nearestDistances].sort((a, b) => a - b));
+  // Distances are recomputed from the supplied coordinates, not the canned values.
+  assert.ok(nearestDistances[0] < 0.5, `expected a near-zero distance, got ${nearestDistances[0]}`);
+});
+
+test('AI assist reports itself disabled rather than failing the search', async (t) => {
+  const server = createServer().listen(0);
+  t.after(() => server.close());
+  const { port } = server.address();
+
+  const body = await (await fetch(`http://127.0.0.1:${port}/api/medicines?q=zzzqqqxxx`)).json();
+  assert.equal(body.count, 0);
+  assert.equal(body.dataStatus, 'catalog_only_no_match');
+  assert.equal(body.aiAssist.status, 'disabled');
 });

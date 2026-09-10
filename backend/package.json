@@ -11,6 +11,9 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test",
-    "check": "node --check server.js && node --check mock-medicines.js && node --check pharmacy-sources.js"
+    "check": "node -e \"['server.js','mock-medicines.js','pharmacy-sources.js','pharmacy-directory.js','ai-normalizer.js'].forEach(f=>require('node:child_process').execFileSync(process.execPath,['--check',f],{stdio:'inherit'}))\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0"
   }
 }

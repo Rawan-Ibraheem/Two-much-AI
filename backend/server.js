@@ -7,14 +7,39 @@ const { promisify } = require('node:util');
 const { URL } = require('node:url');
 const { pharmacySources: sourceRegistry } = require('./pharmacy-sources');
 const { mockMedicines } = require('./mock-medicines');
+const { branches: branchDirectory, describeBranch } = require('./pharmacy-directory');
+const aiNormalizer = require('./ai-normalizer');
 const execFileAsync = promisify(execFile);
 
+// Minimal .env reader. The backend is intentionally dependency-light, so rather
+// than pulling in dotenv we read the two files this project actually uses.
+// Secrets stay server-side; none of this is ever sent to the browser.
+function loadEnvFile(envPath) {
+  let contents;
+  try {
+    contents = require('node:fs').readFileSync(envPath, 'utf8');
+  } catch {
+    return;
+  }
+  for (const line of contents.split(/\r?\n/)) {
+    if (line.trim().startsWith('#')) continue;
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (!match) continue;
+    const [, key, rawValue] = match;
+    if (process.env[key] !== undefined) continue;
+    process.env[key] = rawValue.replace(/^["']|["']$/g, '');
+  }
+}
+loadEnvFile(path.join(__dirname, '.env'));
+loadEnvFile(path.join(__dirname, '..', 'shared', '.env'));
+
 const checkedRecently = new Date().toISOString();
-const branchCoordinates = {
-  'El Ezaby: Dokki': { latitude: 30.0381, longitude: 31.2118 },
-  'Seif Pharmacy: Mohandessin': { latitude: 30.0488, longitude: 31.2016 },
-  '19011 Pharmacy: Agouza': { latitude: 30.0309, longitude: 31.2152 }
-};
+const branchCoordinates = Object.fromEntries(
+  Object.entries(branchDirectory).map(([key, record]) => [
+    key,
+    { latitude: record.latitude, longitude: record.longitude }
+  ])
+);
 const pharmacySources = {
   'El Ezaby: Dokki': { sourceId: 'el-ezaby', connector: 'mock-public-catalog', sourceUrl: 'mock://el-ezaby/dokki', verificationStatus: 'unverified' },
   'Seif Pharmacy: Mohandessin': { sourceId: 'seif', connector: 'mock-public-catalog', sourceUrl: 'mock://seif/mohandessin', verificationStatus: 'unverified' },
@@ -146,6 +171,30 @@ function distanceInKm(from, to) {
   return 6371 * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
 }
 
+// The catalog keeps strength inside the ingredient string ("Paracetamol 500mg +
+// Caffeine 65mg"). The UI shows it as its own chip, so derive it here instead of
+// duplicating the dose in the data.
+function deriveStrength(ingredient) {
+  const matches = (ingredient || '').match(/\d+(?:\.\d+)?\s*(?:mg|mcg|g|ml|iu)\b/gi);
+  return matches ? matches.join(' + ') : '';
+}
+
+function deriveArabicName(medicine) {
+  const arabic = (medicine.searchTerms || []).find((term) => /[؀-ۿ]/.test(term));
+  return arabic || medicine.name;
+}
+
+function resolveDistance(location, offer) {
+  const coordinates = branchCoordinates[`${offer.pharmacy}: ${offer.branch}`];
+  if (!location || !coordinates) return offer.distanceKm;
+  return Number(distanceInKm(location, coordinates).toFixed(2));
+}
+
+function offerFreshness(offer) {
+  const parsed = Date.parse(offer.lastChecked);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function normalizeSearchText(value) {
   return value
     .normalize('NFKC')
@@ -230,11 +279,12 @@ function searchMedicines(requestUrl) {
     })
     .map((medicine) => ({
       ...medicine,
+      strength: deriveStrength(medicine.ingredient),
+      arabicName: deriveArabicName(medicine),
       offers: (availableOnly ? medicine.offers.filter((offer) => offer.available) : medicine.offers).map((offer) => ({
         ...offer,
-        distanceKm: location
-          ? Number(distanceInKm(location, branchCoordinates[`${offer.pharmacy}: ${offer.branch}`]).toFixed(2))
-          : offer.distanceKm
+        distanceKm: resolveDistance(location, offer),
+        branchInfo: describeBranch(offer.pharmacy, offer.branch)
       }))
     }));
 
@@ -242,9 +292,54 @@ function searchMedicines(requestUrl) {
     results.sort((left, right) => Math.min(...left.offers.map((offer) => offer.price)) - Math.min(...right.offers.map((offer) => offer.price)));
   } else if (sort === 'nearest') {
     results.sort((left, right) => Math.min(...left.offers.map((offer) => offer.distanceKm)) - Math.min(...right.offers.map((offer) => offer.distanceKm)));
+  } else if (sort === 'freshest') {
+    results.sort((left, right) => Math.max(...right.offers.map(offerFreshness)) - Math.max(...left.offers.map(offerFreshness)));
   }
 
   return { originalQuery, query, sort, availableOnly, location, results };
+}
+
+/**
+ * Deterministic search runs first. Only when it finds nothing do we ask Claude
+ * to reinterpret the query, and then we re-run the *same* deterministic matcher
+ * against the catalog names it proposed. Claude can therefore widen recall but
+ * can never fabricate a medicine, price or offer, and any failure (no key, no
+ * network, bad JSON, timeout) leaves the original empty answer untouched.
+ */
+async function searchMedicinesWithAi(requestUrl) {
+  const search = searchMedicines(requestUrl);
+  if (search.error || search.results.length > 0 || !search.originalQuery) return search;
+  if (!aiNormalizer.isConfigured()) {
+    return { ...search, aiAssist: { status: 'disabled' } };
+  }
+
+  const assist = await aiNormalizer.normalizeQuery(
+    search.originalQuery,
+    medicines.map((medicine) => medicine.name)
+  );
+  if (assist.candidates.length === 0) {
+    return { ...search, aiAssist: { status: assist.status, model: assist.model } };
+  }
+
+  const retryUrl = new URL(requestUrl.toString());
+  const matched = [];
+  for (const candidate of assist.candidates) {
+    retryUrl.searchParams.set('q', candidate);
+    for (const result of searchMedicines(retryUrl).results || []) {
+      if (!matched.some((existing) => existing.id === result.id)) matched.push(result);
+    }
+  }
+
+  return {
+    ...search,
+    results: matched,
+    aiAssist: {
+      status: matched.length ? 'matched' : 'no_candidates',
+      model: assist.model,
+      interpretation: assist.interpretation,
+      candidates: assist.candidates
+    }
+  };
 }
 
 function buildCoverage(items) {
@@ -349,23 +444,32 @@ function createServer() {
     }
 
     if (requestUrl.pathname === '/api/medicines') {
-      const search = searchMedicines(requestUrl);
-      if (search.error) return sendJson(response, 400, { error: search.error });
+      return searchMedicinesWithAi(requestUrl)
+        .then((search) => {
+          if (search.error) return sendJson(response, 400, { error: search.error });
 
-      return sendJson(response, 200, {
-        query: search.query,
-        originalQuery: search.originalQuery,
-        sort: search.sort,
-        availableOnly: search.availableOnly,
-        location: search.location,
-        count: search.results.length,
-        dataStatus: search.results.length ? 'catalog_match' : 'catalog_only_no_match',
-        nextStep: search.results.length
-          ? 'Review offers and freshness before relying on availability.'
-          : 'Live pharmacy connectors are not active; add an approved source or API to search this medicine.',
-        lastChecked: new Date().toISOString(),
-        results: search.results
-      });
+          const aiMatched = search.aiAssist?.status === 'matched';
+          return sendJson(response, 200, {
+            query: search.query,
+            originalQuery: search.originalQuery,
+            sort: search.sort,
+            availableOnly: search.availableOnly,
+            location: search.location,
+            count: search.results.length,
+            dataStatus: search.results.length
+              ? (aiMatched ? 'ai_assisted_match' : 'catalog_match')
+              : 'catalog_only_no_match',
+            nextStep: search.results.length
+              ? 'Review offers and freshness before relying on availability.'
+              : 'Live pharmacy connectors are not active; add an approved source or API to search this medicine.',
+            aiAssist: search.aiAssist || { status: 'not_needed' },
+            dataSource: 'demo_catalog',
+            freshnessNote: 'Demo catalog offers. Prices and availability are not live-verified.',
+            lastChecked: new Date().toISOString(),
+            results: search.results
+          });
+        })
+        .catch((error) => sendJson(response, 500, { error: error.message }));
     }
 
     if (request.method === 'POST' && requestUrl.pathname === '/api/search/coverage') {

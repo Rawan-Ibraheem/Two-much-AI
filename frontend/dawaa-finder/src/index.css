@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 entry point. The legacy v3 `@tailwind base/components/utilities`
+   directives used to sit here, but under v4 they only emitted a fraction of the
+   utilities the app uses (63 selectors), so most of the UI rendered unstyled.
+   v4 also no longer auto-loads tailwind.config.js, hence the explicit sources. */
+@import "tailwindcss";
+@source "../index.html";
+@source "./**/*.{ts,tsx}";
 
 :root {
   --bg: #f8fafc;
