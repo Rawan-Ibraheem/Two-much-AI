@@ -74,3 +74,6 @@ The project intentionally does not include:
 - BullMQ/Redis job queue
 
 See [backend/README.md](./backend/README.md) for the audit notes and implementation details.
+
+Demo and Presentation:
+https://drive.google.com/drive/folders/1iYnxFTbQtH5JtoC9L0yOkrDzLbkoxNux?usp=drive_link
